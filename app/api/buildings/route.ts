@@ -11,9 +11,7 @@ export async function GET() {
       .select('*')
       .order('name')
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
+    if (error) throw error
 
     return NextResponse.json(buildings)
   } catch (error) {

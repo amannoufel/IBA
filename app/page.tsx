@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSupabase } from './lib/supabase-client'
+import type { Database } from './types/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -114,7 +115,7 @@ export default function LoginPage() {
         if (!data.user) throw new Error('No user returned from signup')
 
         // Create profile with additional tenant information
-        const profileData: any = { 
+        const profileData: Database['public']['Tables']['profiles']['Insert'] = { 
           id: data.user.id, 
           email, 
           role,

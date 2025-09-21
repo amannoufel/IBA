@@ -21,9 +21,7 @@ export async function GET(request: Request) {
       .eq('building_id', buildingId)
       .order('room_number')
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
+    if (error) throw error
 
     return NextResponse.json(rooms)
   } catch (error) {
