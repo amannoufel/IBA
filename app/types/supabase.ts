@@ -1,11 +1,47 @@
 export type Database = {
   public: {
     Tables: {
+      buildings: {
+        Row: {
+          id: number
+          name: string
+          created_at: string
+        }
+        Insert: {
+          name: string
+          created_at?: string
+        }
+        Update: {
+          name?: string
+          created_at?: string
+        }
+      },
+      rooms: {
+        Row: {
+          id: number
+          building_id: number
+          room_number: string
+          created_at: string
+        }
+        Insert: {
+          building_id: number
+          room_number: string
+          created_at?: string
+        }
+        Update: {
+          building_id?: number
+          room_number?: string
+          created_at?: string
+        }
+      },
       profiles: {
         Row: {
           id: string
           email: string
           role: string
+          mobile: string | null
+          building_id: number | null
+          room_id: number | null
           created_at: string
           updated_at: string
         }
@@ -13,6 +49,9 @@ export type Database = {
           id: string
           email: string
           role: string
+          mobile?: string | null
+          building_id?: number | null
+          room_id?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -20,6 +59,9 @@ export type Database = {
           id?: string
           email?: string
           role?: string
+          mobile?: string | null
+          building_id?: number | null
+          room_id?: number | null
           created_at?: string
           updated_at?: string
         }
