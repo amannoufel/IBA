@@ -10,52 +10,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('TENANT')
   const [mobile, setMobile] = useState('')
-  const [buildingId, setBuildingId] = useState<number | null>(null)
-  const [roomId, setRoomId] = useState<number | null>(null)
-  const [buildings, setBuildings] = useState<Array<{ id: number, name: string }>>([])
-  const [rooms, setRooms] = useState<Array<{ id: number, room_number: string }>>([])
+  const [buildingName, setBuildingName] = useState('')
+  const [roomNumber, setRoomNumber] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
   const supabase = useSupabase()
-
-  // Fetch buildings when signing up as tenant
-  useEffect(() => {
-    if (isSignUp && role === 'TENANT') {
-      fetch('/api/buildings')
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setBuildings(data)
-            if (data.length > 0) {
-              setBuildingId(data[0].id)
-            }
-          }
-        })
-        .catch(err => console.error('Error fetching buildings:', err))
-    }
-  }, [isSignUp, role])
-
-  // Fetch rooms when building is selected
-  useEffect(() => {
-    if (buildingId) {
-      fetch(`/api/rooms?buildingId=${buildingId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setRooms(data)
-            if (data.length > 0) {
-              setRoomId(data[0].id)
-            } else {
-              setRoomId(null)
-            }
-          }
-        })
-        .catch(err => console.error('Error fetching rooms:', err))
-    }
-  }, [buildingId])
 
   // Check URL parameters for errors on component mount
   useEffect(() => {
@@ -85,13 +47,13 @@ export default function LoginPage() {
           setLoading(false)
           return
         }
-        if (!buildingId) {
-          setError('Please select a building')
+        if (!buildingName?.trim()) {
+          setError('Building name is required')
           setLoading(false)
           return
         }
-        if (!roomId) {
-          setError('Please select a room')
+        if (!roomNumber?.trim()) {
+          setError('Room number is required')
           setLoading(false)
           return
         }
@@ -100,11 +62,11 @@ export default function LoginPage() {
       if (isSignUp) {
         // Validate tenant-specific fields
         if (role === 'TENANT') {
-          if (!mobile) {
+          if (!mobile?.trim()) {
             throw new Error('Mobile number is required for tenants')
           }
-          if (!buildingId || !roomId) {
-            throw new Error('Building and Room selection is required for tenants')
+          if (!buildingName?.trim() || !roomNumber?.trim()) {
+            throw new Error('Building name and Room number are required for tenants')
           }
         }
 
@@ -114,7 +76,13 @@ export default function LoginPage() {
           password,
           options: {
             data: {
-              role: role
+              role: role,
+              // Store tenant details in metadata for use during confirmation
+              ...(role === 'TENANT' ? {
+                mobile,
+                building_name: buildingName,
+                room_number: roomNumber
+              } : {})
             },
             emailRedirectTo: redirectTo
           }
@@ -123,41 +91,7 @@ export default function LoginPage() {
         if (error) throw error
         if (!data.user) throw new Error('No user returned from signup')
 
-        try {
-          // Create profile with additional tenant information
-          const profileData: Database['public']['Tables']['profiles']['Insert'] = { 
-            id: data.user.id, 
-            email, 
-            role,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-
-          // Add tenant-specific fields if role is tenant
-          if (role === 'TENANT') {
-            profileData.mobile = mobile
-            profileData.building_id = buildingId
-            profileData.room_id = roomId
-          }
-
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert([profileData])
-            .single()
-
-          if (profileError) {
-            console.error('Profile creation error:', profileError)
-            
-            // Delete the auth user if profile creation fails
-            await supabase.auth.admin.deleteUser(data.user.id)
-            throw new Error('Failed to create user profile. Please try again.')
-          }
-
-          alert('Please check your email for the confirmation link!')
-        } catch (profileError) {
-          console.error('Profile creation error:', profileError)
-          throw profileError
-        }
+        alert('Please check your email for the confirmation link!')
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
@@ -271,45 +205,33 @@ export default function LoginPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Building
+                      Building Name
                     </label>
-                    <select
-                      value={buildingId || ''}
-                      onChange={(e) => setBuildingId(Number(e.target.value))}
-                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    <input
+                      type="text"
+                      value={buildingName}
+                      onChange={(e) => setBuildingName(e.target.value)}
+                      className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="Enter building name"
                       required
                       disabled={loading}
-                    >
-                      <option value="">Select a building</option>
-                      {buildings.map((building) => (
-                        <option key={building.id} value={building.id}>
-                          {building.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
-                  {buildingId && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Room Number
-                      </label>
-                      <select
-                        value={roomId || ''}
-                        onChange={(e) => setRoomId(Number(e.target.value))}
-                        className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        required
-                        disabled={loading}
-                      >
-                        <option value="">Select a room</option>
-                        {rooms.map((room) => (
-                          <option key={room.id} value={room.id}>
-                            {room.room_number}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Room Number
+                    </label>
+                    <input
+                      type="text"
+                      value={roomNumber}
+                      onChange={(e) => setRoomNumber(e.target.value)}
+                      className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="Enter room number"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
                 </>
               )}
             </>
