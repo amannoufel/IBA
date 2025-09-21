@@ -78,14 +78,23 @@ export default function LoginPage() {
     setLoading(true)
     
     try {
-      // First, try to set up the session
-      const sessionResponse = await fetch('/api/auth/set-session', {
-        method: 'POST',
-        credentials: 'include',
-      })
-      
-      if (!sessionResponse.ok) {
-        console.warn('Session setup warning:', await sessionResponse.text())
+      // Validate form fields for tenant signup
+      if (isSignUp && role === 'TENANT') {
+        if (!mobile?.trim()) {
+          setError('Mobile number is required')
+          setLoading(false)
+          return
+        }
+        if (!buildingId) {
+          setError('Please select a building')
+          setLoading(false)
+          return
+        }
+        if (!roomId) {
+          setError('Please select a room')
+          setLoading(false)
+          return
+        }
       }
       
       if (isSignUp) {
@@ -114,32 +123,41 @@ export default function LoginPage() {
         if (error) throw error
         if (!data.user) throw new Error('No user returned from signup')
 
-        // Create profile with additional tenant information
-        const profileData: Database['public']['Tables']['profiles']['Insert'] = { 
-          id: data.user.id, 
-          email, 
-          role,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
+        try {
+          // Create profile with additional tenant information
+          const profileData: Database['public']['Tables']['profiles']['Insert'] = { 
+            id: data.user.id, 
+            email, 
+            role,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
 
-        // Add tenant-specific fields if role is tenant
-        if (role === 'TENANT') {
-          profileData.mobile = mobile
-          profileData.building_id = buildingId
-          profileData.room_id = roomId
-        }
+          // Add tenant-specific fields if role is tenant
+          if (role === 'TENANT') {
+            profileData.mobile = mobile
+            profileData.building_id = buildingId
+            profileData.room_id = roomId
+          }
 
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([profileData])
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([profileData])
+            .single()
 
-        if (profileError) {
+          if (profileError) {
+            console.error('Profile creation error:', profileError)
+            
+            // Delete the auth user if profile creation fails
+            await supabase.auth.admin.deleteUser(data.user.id)
+            throw new Error('Failed to create user profile. Please try again.')
+          }
+
+          alert('Please check your email for the confirmation link!')
+        } catch (profileError) {
           console.error('Profile creation error:', profileError)
           throw profileError
         }
-
-        alert('Please check your email for the confirmation link!')
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
@@ -170,11 +188,13 @@ export default function LoginPage() {
       if (error instanceof Error) {
         if (error.message.includes('User already registered')) {
           setError('An account with this email already exists. Please check your email for the confirmation link or try signing in.')
+        } else if (error.message.includes('row-level security')) {
+          setError('Permission denied. Please try again.')
         } else {
           setError(error.message)
         }
       } else {
-        setError('An unexpected error occurred')
+        setError('An unexpected error occurred. Please try again.')
       }
     } finally {
       setLoading(false)
