@@ -1,9 +1,10 @@
-{
+﻿{
   "buildCommand": "next build",
   "devCommand": "next dev",
   "installCommand": "npm install",
   "framework": "nextjs",
   "outputDirectory": ".next",
+  "buildTimestamp": "2025-09-22T20:45:00Z",
   "env": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://jgczsjmskwnlqmzmryfl.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpnY3pzam1za3dubHFtem1yeWZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxOTg0MTIsImV4cCI6MjA3Mzc3NDQxMn0.WtmTefna2Z7Ut2xo1Bn67ebO72Ull5XOKC7Sn8aIj8Y"
