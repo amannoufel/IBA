@@ -17,6 +17,15 @@ export default function TenantDashboard() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [myComplaints, setMyComplaints] = useState<Array<{
+    id: number
+    type_id: number
+    type_name: string | null
+    description: string
+    status: string
+    image_url: string | null
+    created_at: string
+  }>>([])
   const router = useRouter()
   const supabase = useSupabase()
 
@@ -60,6 +69,13 @@ export default function TenantDashboard() {
             setSelectedType(types[0].id)
           }
         }
+
+        // Fetch my complaints
+        const mineRes = await fetch('/api/complaints/mine')
+        if (mineRes.ok) {
+          const mine = await mineRes.json()
+          if (Array.isArray(mine)) setMyComplaints(mine)
+        }
       } catch (error) {
         console.error('Unexpected error:', error)
         router.replace('/')
@@ -102,6 +118,13 @@ export default function TenantDashboard() {
       setImageFile(null)
       setImagePreview(null)
       alert('Complaint submitted successfully!')
+
+      // Refresh my complaints
+      const mineRes = await fetch('/api/complaints/mine', { cache: 'no-store' })
+      if (mineRes.ok) {
+        const mine = await mineRes.json()
+        if (Array.isArray(mine)) setMyComplaints(mine)
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to submit complaint')
     } finally {
@@ -211,6 +234,53 @@ export default function TenantDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+
+          <div className="bg-white shadow rounded-lg p-6 mt-8">
+            <h2 className="text-2xl font-semibold mb-4">My Complaints</h2>
+            {myComplaints.length === 0 ? (
+              <p className="text-gray-600">You haven't submitted any complaints yet.</p>
+            ) : (
+              <ul className="divide-y divide-gray-200">
+                {myComplaints.map((c) => (
+                  <li key={c.id} className="py-4 flex items-start gap-4">
+                    {c.image_url ? (
+                      <img
+                        src={c.image_url}
+                        alt="Complaint"
+                        className="w-20 h-20 object-cover rounded border"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 flex items-center justify-center bg-gray-100 text-gray-400 rounded border text-xs">
+                        No Image
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-500">{new Date(c.created_at).toLocaleString()}</p>
+                          <h3 className="text-lg font-medium">{c.type_name ?? 'Complaint'} </h3>
+                        </div>
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
+                            c.status === 'pending'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : c.status === 'in_progress'
+                              ? 'bg-blue-100 text-blue-800'
+                              : c.status === 'resolved'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {c.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <p className="text-gray-700 mt-2 whitespace-pre-line">{c.description}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </main>
