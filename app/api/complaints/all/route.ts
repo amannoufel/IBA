@@ -46,7 +46,6 @@ export async function GET() {
         type_id,
         description, 
         status, 
-        image_path, 
         created_at,
         tenant_id
       `)
@@ -102,7 +101,7 @@ export async function GET() {
       type_id: number
       description: string
       status: string
-      image_path: string | null
+      image_path?: string | null
       created_at: string
       tenant_id: string
     }) => {
