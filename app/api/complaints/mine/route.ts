@@ -1,6 +1,10 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import type { Database } from '../../../types/supabase'
+
+type ComplaintRow = Database['public']['Tables']['complaints']['Row']
+type ComplaintSubset = Pick<ComplaintRow, 'id' | 'type_id' | 'description' | 'status' | 'image_path' | 'created_at'>
 
 export async function GET() {
   const supabase = createRouteHandlerClient({ cookies })
@@ -11,38 +15,54 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch complaints joined with type name
-    const { data, error } = await supabase
+    // Fetch complaints for this tenant
+    const { data: complaints, error: complaintsError } = await supabase
       .from('complaints')
-      .select('id, type_id, description, status, image_path, created_at, complaint_types!inner(name)')
+      .select('id, type_id, description, status, image_path, created_at')
       .eq('tenant_id', user.id)
       .order('created_at', { ascending: false })
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+    if (complaintsError) {
+      return NextResponse.json({ error: complaintsError.message }, { status: 400 })
     }
 
-    // Map to include a public URL if available
-    const withUrls = (data || []).map((c: any) => {
-      let image_url: string | null = null
-      if (c.image_path) {
-        const { data: pub } = supabase.storage.from('complaint-images').getPublicUrl(c.image_path)
-        image_url = pub?.publicUrl ?? null
+  const list: ComplaintSubset[] = (complaints ?? []) as ComplaintSubset[]
+    const typeIds = Array.from(new Set(list.map(c => c.type_id)))
+
+    // Fetch type names
+    let typeNameById = new Map<number, string>()
+    if (typeIds.length > 0) {
+      const { data: types, error: typesError } = await supabase
+        .from('complaint_types')
+        .select('id, name')
+        .in('id', typeIds)
+      if (typesError) {
+        return NextResponse.json({ error: typesError.message }, { status: 400 })
       }
+      for (const t of types ?? []) {
+        typeNameById.set(t.id as number, t.name as string)
+      }
+    }
+
+    // Map to include a public URL and type name
+    const result = list.map(c => {
+      const pub = c.image_path
+        ? supabase.storage.from('complaint-images').getPublicUrl(c.image_path)
+        : { data: { publicUrl: null } }
       return {
         id: c.id,
         type_id: c.type_id,
-        type_name: c.complaint_types?.name ?? null,
+        type_name: typeNameById.get(c.type_id) ?? null,
         description: c.description,
         status: c.status,
         image_path: c.image_path,
-        image_url,
+        image_url: pub?.data?.publicUrl ?? null,
         created_at: c.created_at,
       }
     })
 
-    return NextResponse.json(withUrls)
-  } catch (e) {
+    return NextResponse.json(result)
+  } catch {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

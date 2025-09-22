@@ -239,7 +239,7 @@ export default function TenantDashboard() {
           <div className="bg-white shadow rounded-lg p-6 mt-8">
             <h2 className="text-2xl font-semibold mb-4">My Complaints</h2>
             {myComplaints.length === 0 ? (
-              <p className="text-gray-600">You haven't submitted any complaints yet.</p>
+              <p className="text-gray-600">You haven&apos;t submitted any complaints yet.</p>
             ) : (
               <ul className="divide-y divide-gray-200">
                 {myComplaints.map((c) => (
