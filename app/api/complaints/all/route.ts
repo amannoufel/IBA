@@ -74,12 +74,12 @@ export async function GET() {
     const profilesMap = (profiles || []).reduce((acc, p) => {
       acc[p.id] = p
       return acc
-    }, {} as Record<string, any>)
+    }, {} as Record<string, { id: string; email: string; building_name: string; room_number: string }>)
 
     const typesMap = (complaintTypes || []).reduce((acc, t) => {
       acc[t.id] = t
       return acc
-    }, {} as Record<number, any>)
+    }, {} as Record<number, { id: number; name: string }>)
 
     // Map to include a public URL if available
     const result = (complaints || []).map((c: {
