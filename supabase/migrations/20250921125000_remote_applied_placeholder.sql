@@ -1,0 +1,3 @@
+-- Placeholder migration to align with remote history
+-- This migration was applied remotely but is missing in the local repo.
+-- No-op to keep local and remote migration timelines consistent.

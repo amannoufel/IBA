@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSupabase } from '../lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
@@ -13,6 +13,8 @@ export default function TenantDashboard() {
   const [complaintTypes, setComplaintTypes] = useState<ComplaintType[]>([])
   const [selectedType, setSelectedType] = useState<number>(0)
   const [description, setDescription] = useState('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -72,21 +74,22 @@ export default function TenantDashboard() {
     router.replace('/')
   }
 
-  const handleSubmitComplaint = async (e: React.FormEvent) => {
+  const handleSubmitComplaint = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
 
     try {
+      const formData = new FormData()
+      formData.append('type_id', String(selectedType))
+      formData.append('description', description)
+      if (imageFile) {
+        formData.append('image', imageFile)
+      }
+
       const response = await fetch('/api/complaints', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type_id: selectedType,
-          description,
-        }),
+        body: formData,
       })
 
       if (!response.ok) {
@@ -96,6 +99,8 @@ export default function TenantDashboard() {
 
       // Reset form
       setDescription('')
+      setImageFile(null)
+      setImagePreview(null)
       alert('Complaint submitted successfully!')
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to submit complaint')
@@ -140,7 +145,7 @@ export default function TenantDashboard() {
                 <select
                   id="complaintType"
                   value={selectedType}
-                  onChange={(e) => setSelectedType(Number(e.target.value))}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedType(Number(e.target.value))}
                   className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 >
@@ -159,12 +164,39 @@ export default function TenantDashboard() {
                 <textarea
                   id="description"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
                   rows={4}
                   className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="Please describe your complaint in detail..."
                   required
                 />
+              </div>
+
+              <div>
+                <label htmlFor="image" className="block text-sm font-medium text-gray-700">
+                  Photo (optional)
+                </label>
+                <input
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const file = e.target.files?.[0] || null
+                    setImageFile(file)
+                    if (file) {
+                      const url = URL.createObjectURL(file)
+                      setImagePreview(url)
+                    } else {
+                      setImagePreview(null)
+                    }
+                  }}
+                  className="mt-1 block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                />
+                {imagePreview && (
+                  <div className="mt-2">
+                    <img src={imagePreview} alt="Preview" className="h-32 rounded-md object-cover border" />
+                  </div>
+                )}
               </div>
 
               <div>

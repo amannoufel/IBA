@@ -55,6 +55,7 @@ export type Database = {
           type_id: number
           description: string
           status: string
+          image_path: string | null
           created_at: string
           updated_at: string
         }
@@ -63,6 +64,7 @@ export type Database = {
           type_id: number
           description: string
           status?: string
+          image_path?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -71,6 +73,7 @@ export type Database = {
           type_id?: number
           description?: string
           status?: string
+          image_path?: string | null
           created_at?: string
           updated_at?: string
         }
