@@ -30,7 +30,7 @@ export async function GET() {
     const typeIds = Array.from(new Set(list.map(c => c.type_id)))
 
     // Fetch type names
-    let typeNameById = new Map<number, string>()
+    const typeNameById = new Map<number, string>()
     if (typeIds.length > 0) {
       const { data: types, error: typesError } = await supabase
         .from('complaint_types')
