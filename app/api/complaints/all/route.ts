@@ -23,7 +23,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden: Supervisor access required' }, { status: 403 })
     }
 
-    // Fetch all complaints with tenant profiles and complaint types
+    // Fetch all complaints first
     const { data: complaints, error: complaintsError } = await supabase
       .from('complaints')
       .select(`
@@ -33,21 +33,53 @@ export async function GET() {
         status, 
         image_path, 
         created_at,
-        tenant_id,
-        profiles!tenant_id (
-          email,
-          building_name,
-          room_number
-        ),
-        complaint_types!type_id (
-          name
-        )
+        tenant_id
       `)
       .order('created_at', { ascending: false })
 
     if (complaintsError) {
       return NextResponse.json({ error: complaintsError.message }, { status: 400 })
     }
+
+    // If no complaints, return empty array
+    if (!complaints || complaints.length === 0) {
+      return NextResponse.json([])
+    }
+
+    // Get unique tenant IDs and type IDs
+    const tenantIds = [...new Set(complaints.map(c => c.tenant_id))]
+    const typeIds = [...new Set(complaints.map(c => c.type_id))]
+
+    // Fetch profiles for all tenants
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, email, building_name, room_number')
+      .in('id', tenantIds)
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError)
+    }
+
+    // Fetch complaint types
+    const { data: complaintTypes, error: typesError } = await supabase
+      .from('complaint_types')
+      .select('id, name')
+      .in('id', typeIds)
+
+    if (typesError) {
+      console.error('Error fetching complaint types:', typesError)
+    }
+
+    // Create lookup maps
+    const profilesMap = (profiles || []).reduce((acc, p) => {
+      acc[p.id] = p
+      return acc
+    }, {} as Record<string, any>)
+
+    const typesMap = (complaintTypes || []).reduce((acc, t) => {
+      acc[t.id] = t
+      return acc
+    }, {} as Record<number, any>)
 
     // Map to include a public URL if available
     const result = (complaints || []).map((c: {
@@ -58,8 +90,6 @@ export async function GET() {
       image_path: string | null
       created_at: string
       tenant_id: string
-      profiles: { email: string; building_name: string; room_number: string }[]
-      complaint_types: { name: string }[]
     }) => {
       let image_url = null
       if (c.image_path) {
@@ -67,14 +97,17 @@ export async function GET() {
         image_url = pub?.publicUrl ?? null
       }
 
+      const profile = profilesMap[c.tenant_id]
+      const complaintType = typesMap[c.type_id]
+
       return {
         id: c.id,
         tenant_id: c.tenant_id,
-        tenant_email: c.profiles?.[0]?.email || 'Unknown',
-        building: c.profiles?.[0]?.building_name || 'Unknown',
-        flat: c.profiles?.[0]?.room_number || 'Unknown',
+        tenant_email: profile?.email || 'Unknown',
+        building: profile?.building_name || 'Unknown',
+        flat: profile?.room_number || 'Unknown',
         type_id: c.type_id,
-        category: c.complaint_types?.[0]?.name || 'Unknown',
+        category: complaintType?.name || 'Unknown',
         description: c.description,
         status: c.status,
         image_path: c.image_path,
