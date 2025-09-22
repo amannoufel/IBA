@@ -3,9 +3,13 @@ import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import type { Database } from '../../../types/supabase'
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies })
+    const { id } = await params
     
     // Check if user is authenticated and is supervisor
     const { data: { user } } = await supabase.auth.getUser()
@@ -18,7 +22,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const complaintId = params.id
     const { status } = await request.json()
     
     if (!['pending', 'attended', 'completed'].includes(status)) {
@@ -32,7 +35,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const { error } = await supabase
       .from('complaints')
       .update({ status })
-      .eq('id', complaintId)
+      .eq('id', id)
 
     if (error) {
       console.error('Error updating complaint status:', error)
