@@ -12,14 +12,29 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is a supervisor
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    // Check if user is a supervisor - check both JWT metadata and profile table
+    let isSupervisor = false
+    
+    // First check JWT user_metadata.role
+    const userMetadataRole = user.user_metadata?.role?.toLowerCase()
+    if (userMetadataRole === 'supervisor') {
+      isSupervisor = true
+    }
+    
+    // If not found in JWT, check profile table (fallback)
+    if (!isSupervisor) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
 
-    if (profileError || !profile || profile.role.toLowerCase() !== 'supervisor') {
+      if (!profileError && profile && profile.role.toLowerCase() === 'supervisor') {
+        isSupervisor = true
+      }
+    }
+
+    if (!isSupervisor) {
       return NextResponse.json({ error: 'Forbidden: Supervisor access required' }, { status: 403 })
     }
 
