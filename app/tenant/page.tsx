@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useSupabase } from '../lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
+import Image from 'next/image'
 import { Database } from '../types/supabase'
 
 type ComplaintType = Database['public']['Tables']['complaint_types']['Row']
@@ -217,7 +218,7 @@ export default function TenantDashboard() {
                 />
                 {imagePreview && (
                   <div className="mt-2">
-                    <img src={imagePreview} alt="Preview" className="h-32 rounded-md object-cover border" />
+                    <Image src={imagePreview} alt="Preview" width={200} height={128} className="h-32 rounded-md object-cover border" />
                   </div>
                 )}
               </div>
@@ -245,9 +246,11 @@ export default function TenantDashboard() {
                 {myComplaints.map((c) => (
                   <li key={c.id} className="py-4 flex items-start gap-4">
                     {c.image_url ? (
-                      <img
+                      <Image
                         src={c.image_url}
                         alt="Complaint"
+                        width={80}
+                        height={80}
                         className="w-20 h-20 object-cover rounded border"
                       />
                     ) : (

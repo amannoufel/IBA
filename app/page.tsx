@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useSupabase } from './lib/supabase-client'
-import type { Database } from './types/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -15,7 +14,6 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   const supabase = useSupabase()
 

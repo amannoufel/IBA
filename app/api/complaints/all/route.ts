@@ -1,7 +1,6 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import type { Database } from '../../../types/supabase'
 
 export async function GET() {
   const supabase = createRouteHandlerClient({ cookies })
@@ -51,7 +50,17 @@ export async function GET() {
     }
 
     // Map to include a public URL if available
-    const result = (complaints || []).map((c: any) => {
+    const result = (complaints || []).map((c: {
+      id: number
+      type_id: number
+      description: string
+      status: string
+      image_path: string | null
+      created_at: string
+      tenant_id: string
+      profiles: { email: string; building_name: string; room_number: string }[]
+      complaint_types: { name: string }[]
+    }) => {
       let image_url = null
       if (c.image_path) {
         const { data: pub } = supabase.storage.from('complaint-images').getPublicUrl(c.image_path)
@@ -61,11 +70,11 @@ export async function GET() {
       return {
         id: c.id,
         tenant_id: c.tenant_id,
-        tenant_email: c.profiles?.email,
-        building: c.profiles?.building_name || 'Unknown',
-        flat: c.profiles?.room_number || 'Unknown',
+        tenant_email: c.profiles?.[0]?.email || 'Unknown',
+        building: c.profiles?.[0]?.building_name || 'Unknown',
+        flat: c.profiles?.[0]?.room_number || 'Unknown',
         type_id: c.type_id,
-        category: c.complaint_types?.name || 'Unknown',
+        category: c.complaint_types?.[0]?.name || 'Unknown',
         description: c.description,
         status: c.status,
         image_path: c.image_path,

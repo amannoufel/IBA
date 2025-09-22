@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useSupabase } from '../lib/supabase-client'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
+import Image from 'next/image'
 
 type Complaint = {
   id: number
@@ -19,7 +19,6 @@ type Complaint = {
 }
 
 export default function SupervisorDashboard() {
-  const [user, setUser] = useState<User | null>(null)
   const [complaints, setComplaints] = useState<Complaint[]>([])
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -35,7 +34,6 @@ export default function SupervisorDashboard() {
           router.replace('/')
           return
         }
-        setUser(user)
         await fetchComplaints()
       } catch (error) {
         console.error('Error:', error)
@@ -260,9 +258,11 @@ export default function SupervisorDashboard() {
               {selectedComplaint.image_url && (
                 <div className="mb-4">
                   <p className="text-sm font-medium text-gray-500 mb-1">Photo</p>
-                  <img 
+                  <Image 
                     src={selectedComplaint.image_url} 
                     alt="Complaint" 
+                    width={800}
+                    height={600}
                     className="w-full max-h-60 object-contain rounded border"
                   />
                 </div>
