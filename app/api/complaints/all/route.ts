@@ -34,12 +34,12 @@ export async function GET() {
         image_path, 
         created_at,
         tenant_id,
-        profiles:tenant_id (
+        profiles!tenant_id (
           email,
           building_name,
           room_number
         ),
-        complaint_types:type_id (
+        complaint_types!type_id (
           name
         )
       `)
