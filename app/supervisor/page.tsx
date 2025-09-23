@@ -263,6 +263,7 @@ export default function SupervisorDashboard() {
                     alt="Complaint" 
                     width={800}
                     height={600}
+                    unoptimized
                     className="w-full max-h-60 object-contain rounded border"
                   />
                 </div>

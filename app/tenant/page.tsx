@@ -218,7 +218,7 @@ export default function TenantDashboard() {
                 />
                 {imagePreview && (
                   <div className="mt-2">
-                    <Image src={imagePreview} alt="Preview" width={200} height={128} className="h-32 rounded-md object-cover border" />
+                    <Image src={imagePreview} alt="Preview" width={200} height={128} unoptimized className="h-32 rounded-md object-cover border" />
                   </div>
                 )}
               </div>
@@ -251,6 +251,7 @@ export default function TenantDashboard() {
                         alt="Complaint"
                         width={80}
                         height={80}
+                        unoptimized
                         className="w-20 h-20 object-cover rounded border"
                       />
                     ) : (
