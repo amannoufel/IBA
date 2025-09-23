@@ -46,6 +46,7 @@ export async function GET() {
         type_id,
         description, 
         status, 
+        image_path,
         created_at,
         tenant_id
       `)
@@ -67,7 +68,7 @@ export async function GET() {
     // Fetch profiles for all tenants
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, email, building_name, room_number')
+      .select('id, email, building_name, room_number, building, flat')
       .in('id', tenantIds)
 
     if (profilesError) {
@@ -88,7 +89,7 @@ export async function GET() {
     const profilesMap = (profiles || []).reduce((acc, p) => {
       acc[p.id] = p
       return acc
-    }, {} as Record<string, { id: string; email: string; building_name: string; room_number: string }>)
+    }, {} as Record<string, { id: string; email: string; building_name?: string | null; room_number?: string | null; building?: string | null; flat?: string | null }>)
 
     const typesMap = (complaintTypes || []).reduce((acc, t) => {
       acc[t.id] = t
@@ -118,8 +119,8 @@ export async function GET() {
         id: c.id,
         tenant_id: c.tenant_id,
         tenant_email: profile?.email || 'Unknown',
-        building: profile?.building_name || 'Unknown',
-        flat: profile?.room_number || 'Unknown',
+        building: profile?.building_name || profile?.building || 'Unknown',
+        flat: profile?.room_number || profile?.flat || 'Unknown',
         type_id: c.type_id,
         category: complaintType?.name || 'Unknown',
         description: c.description,
