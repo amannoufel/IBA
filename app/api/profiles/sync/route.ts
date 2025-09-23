@@ -24,13 +24,39 @@ export async function POST() {
       return NextResponse.json({ message: 'No metadata to sync' })
     }
 
-    const { error: upErr } = await supabase
+    // Try update first
+    const { data: updated, error: upErr } = await supabase
       .from('profiles')
       .update(payload)
       .eq('id', user.id)
+      .select('id')
+      .maybeSingle()
 
     if (upErr) {
       return NextResponse.json({ error: upErr.message }, { status: 400 })
+    }
+
+    // If no row was updated, insert a new profile row
+    if (!updated?.id) {
+      const now = new Date().toISOString()
+      type ProfileInsert = Database['public']['Tables']['profiles']['Insert']
+      const insertPayload: ProfileInsert = {
+        id: user.id,
+        email: user.email ?? '',
+        role: (meta.role as string) || 'supervisor',
+        name: (Object.prototype.hasOwnProperty.call(meta, 'name') ? (meta.name as string | null) : null) ?? null,
+        mobile: (meta.mobile as string | undefined) ?? null,
+        building_name: (Object.prototype.hasOwnProperty.call(meta, 'building_name') ? (meta.building_name as string | null) : null) ?? null,
+        room_number: (Object.prototype.hasOwnProperty.call(meta, 'room_number') ? (meta.room_number as string | null) : null) ?? null,
+        created_at: now,
+        updated_at: now,
+      }
+      const { error: insErr } = await supabase
+        .from('profiles')
+        .insert([insertPayload])
+      if (insErr) {
+        return NextResponse.json({ error: insErr.message }, { status: 400 })
+      }
     }
 
     return NextResponse.json({ message: 'Profile synced' })
