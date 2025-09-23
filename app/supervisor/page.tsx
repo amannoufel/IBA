@@ -34,6 +34,8 @@ export default function SupervisorDashboard() {
           router.replace('/')
           return
         }
+        // Attempt to sync profile in case metadata changed
+        try { await fetch('/api/profiles/sync', { method: 'POST' }) } catch {}
         await fetchComplaints()
       } catch (error) {
         console.error('Error:', error)

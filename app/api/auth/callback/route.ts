@@ -17,15 +17,20 @@ export async function GET(request: Request) {
     // Exchange the code for a session
     await supabase.auth.exchangeCodeForSession(code)
     
-    // Get the session to check the user's role
+    // Get the session to check the user's role (refresh session to ensure latest metadata)
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (!sessionError) {
+      await supabase.auth.refreshSession()
+    }
     
     if (sessionError || !session?.user) {
       console.error('Session error:', sessionError)
       return NextResponse.redirect(new URL('/?error=Authentication failed', request.url))
     }
 
-    const { user } = session
+  // Re-read the session after refresh to pick up metadata
+  const { data: { session: fresh } } = await supabase.auth.getSession()
+  const { user } = fresh ?? session
     const role = user.user_metadata?.role?.toLowerCase()
     
     if (!role) {
@@ -43,10 +48,14 @@ export async function GET(request: Request) {
         role: user.user_metadata.role,
         updated_at: now,
       }
-      if (user.user_metadata?.mobile) {
-        payload.mobile = user.user_metadata.mobile
-        payload.building_name = user.user_metadata.building_name ?? null
-        payload.room_number = user.user_metadata.room_number ?? null
+      if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'mobile')) {
+        payload.mobile = (user.user_metadata as Record<string, unknown>).mobile as string | null
+      }
+      if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'building_name')) {
+        payload.building_name = (user.user_metadata as Record<string, unknown>).building_name as string | null
+      }
+      if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'room_number')) {
+        payload.room_number = (user.user_metadata as Record<string, unknown>).room_number as string | null
       }
 
       // Try update first; if no row, insert
