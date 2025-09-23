@@ -12,18 +12,19 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Ensure caller is a supervisor (prefer profiles.role; fallback to JWT metadata)
+    // Check if user is supervisor via helper function first
     let isSupervisor = false
-    // Try profiles.role (more stable than JWT metadata in production)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    if (profile?.role && String(profile.role).toLowerCase() === 'supervisor') {
-      isSupervisor = true
+    try {
+      const { data: helperResult, error: helperError } = await supabase
+        .rpc('is_supervisor', { uid: user.id })
+      if (!helperError && helperResult === true) {
+        isSupervisor = true
+      }
+    } catch (e) {
+      // Helper function might not exist yet, try JWT fallback
     }
-    // Fallback to JWT user_metadata.role if profile missing
+    
+    // Fallback to JWT user_metadata.role if helper failed
     if (!isSupervisor) {
       const meta = user.user_metadata as Record<string, unknown> | null | undefined
       let jwtRole = ''
@@ -32,8 +33,9 @@ export async function GET() {
       }
       if (jwtRole === 'supervisor') isSupervisor = true
     }
+    
     if (!isSupervisor) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ error: 'Forbidden: Not a supervisor' }, { status: 403 })
     }
 
     // Fetch complaints; RLS should now allow due to supervisor policies
