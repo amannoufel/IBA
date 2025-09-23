@@ -12,8 +12,27 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Let RLS handle supervisor authorization - just try to fetch complaints
-    // RLS policies will return empty result if user is not a supervisor
+    // Ensure caller is a supervisor (prefer profiles.role; fallback to JWT metadata)
+    let isSupervisor = false
+    // Try profiles.role (more stable than JWT metadata in production)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile?.role && String(profile.role).toLowerCase() === 'supervisor') {
+      isSupervisor = true
+    }
+    // Fallback to JWT user_metadata.role if profile missing
+    if (!isSupervisor) {
+      const jwtRole = (user.user_metadata as any)?.role ? String((user.user_metadata as any).role).toLowerCase() : ''
+      if (jwtRole === 'supervisor') isSupervisor = true
+    }
+    if (!isSupervisor) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Fetch complaints; RLS should now allow due to supervisor policies
     const { data: complaints, error: complaintsError } = await supabase
       .from('complaints')
       .select(`
@@ -58,8 +77,7 @@ export async function GET() {
       }
     }
 
-    // Fetch complaint types
-    // Fetch complaint types (only if we have IDs)
+  // Fetch complaint types (only if we have IDs)
     let complaintTypes: Array<{ id: number; name: string }> | null = []
     if (typeIds.length > 0) {
       const { data: t, error: typesError } = await supabase
