@@ -15,6 +15,7 @@ export async function POST() {
   type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
   const payload: ProfileUpdate = { updated_at: new Date().toISOString() }
     if (meta.role) payload.role = meta.role
+    if (Object.prototype.hasOwnProperty.call(meta, 'name')) payload.name = meta.name ?? null
     if (meta.mobile) payload.mobile = meta.mobile
     if (Object.prototype.hasOwnProperty.call(meta, 'building_name')) payload.building_name = meta.building_name ?? null
     if (Object.prototype.hasOwnProperty.call(meta, 'room_number')) payload.room_number = meta.room_number ?? null

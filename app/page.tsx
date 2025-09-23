@@ -7,6 +7,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('TENANT')
+  const [name, setName] = useState('')
   const [mobile, setMobile] = useState('')
   const [buildingName, setBuildingName] = useState('')
   const [roomNumber, setRoomNumber] = useState('')
@@ -58,6 +59,13 @@ export default function LoginPage() {
     
     try {
       // Validate form fields for tenant signup
+      if (isSignUp) {
+        if (!name?.trim()) {
+          setError('Full name is required')
+          setLoading(false)
+          return
+        }
+      }
       if (isSignUp && role === 'TENANT') {
         if (!mobile?.trim()) {
           setError('Mobile number is required')
@@ -93,6 +101,7 @@ export default function LoginPage() {
           password,
           options: {
             data: {
+              name,
               role: role,
               // Store tenant details in metadata for use during confirmation
               ...(role === 'TENANT' ? {
@@ -188,6 +197,19 @@ export default function LoginPage() {
 
           {isSignUp && (
             <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  placeholder="Enter your full name"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700">Role</label>
                 <select

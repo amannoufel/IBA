@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email')
+    .select('id, email, name')
     .eq('role', 'WORKER')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })

@@ -6,6 +6,7 @@ export type Database = {
           id: string
           email: string
           role: string
+          name: string | null
           mobile: string | null
           building_name: string | null
           room_number: string | null
@@ -16,6 +17,7 @@ export type Database = {
           id: string
           email: string
           role: string
+          name?: string | null
           mobile?: string | null
           building_name?: string | null
           room_number?: string | null
@@ -26,6 +28,7 @@ export type Database = {
           id?: string
           email?: string
           role?: string
+          name?: string | null
           mobile?: string | null
           building_name?: string | null
           room_number?: string | null

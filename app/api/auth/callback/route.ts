@@ -51,6 +51,9 @@ export async function GET(request: Request) {
       if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'mobile')) {
         payload.mobile = (user.user_metadata as Record<string, unknown>).mobile as string | null
       }
+      if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'name')) {
+        payload.name = (user.user_metadata as Record<string, unknown>).name as string | null
+      }
       if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'building_name')) {
         payload.building_name = (user.user_metadata as Record<string, unknown>).building_name as string | null
       }

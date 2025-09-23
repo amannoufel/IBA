@@ -20,7 +20,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from('complaint_assignments')
-    .select('id, worker_id, status, created_at, updated_at, profiles:worker_id (email)')
+    .select('id, worker_id, status, created_at, updated_at, profiles:worker_id (email, name)')
     .eq('complaint_id', complaintId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })

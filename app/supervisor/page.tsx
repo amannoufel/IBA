@@ -9,6 +9,7 @@ type Complaint = {
   id: number
   tenant_id: string
   tenant_email: string
+  tenant_name?: string | null
   building: string
   flat: string
   category: string
@@ -23,10 +24,10 @@ export default function SupervisorDashboard() {
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [workers, setWorkers] = useState<Array<{ id: string; email: string }>>([])
+  const [workers, setWorkers] = useState<Array<{ id: string; email: string; name?: string | null }>>([])
   const [assigning, setAssigning] = useState(false)
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
-  const [assignments, setAssignments] = useState<Array<{ id: number; worker_id: string; status: string; email?: string }>>([])
+  const [assignments, setAssignments] = useState<Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null }>>([])
   const router = useRouter()
   const supabase = useSupabase()
 
@@ -87,12 +88,13 @@ export default function SupervisorDashboard() {
     fetch(`/api/complaints/${complaint.id}/assignments`).then(async (r) => {
       if (!r.ok) return
       const data = await r.json()
-      type RawAssignment = { id: number; worker_id: string; status: string; profiles?: { email?: string | null } | null }
-      const items: Array<{ id: number; worker_id: string; status: string; email?: string }>= ((data || []) as RawAssignment[]).map((a) => ({
+      type RawAssignment = { id: number; worker_id: string; status: string; profiles?: { email?: string | null; name?: string | null } | null }
+      const items: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null }>= ((data || []) as RawAssignment[]).map((a) => ({
         id: a.id,
         worker_id: a.worker_id,
         status: a.status,
         email: a.profiles?.email ?? undefined,
+        name: a.profiles?.name ?? undefined,
       }))
       setAssignments(items)
     })
@@ -184,6 +186,9 @@ export default function SupervisorDashboard() {
                         ID
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tenant
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Date
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -208,6 +213,9 @@ export default function SupervisorDashboard() {
                       <tr key={complaint.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {complaint.id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {complaint.tenant_name || complaint.tenant_email}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(complaint.created_at).toLocaleDateString()}
@@ -292,7 +300,7 @@ export default function SupervisorDashboard() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Tenant</p>
-                  <p>{selectedComplaint.tenant_email}</p>
+                  <p>{selectedComplaint.tenant_name || selectedComplaint.tenant_email}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Location</p>
@@ -337,7 +345,7 @@ export default function SupervisorDashboard() {
                     className="border rounded p-2 min-w-[240px] h-24"
                   >
                     {workers.map(w => (
-                      <option key={w.id} value={w.id}>{w.email}</option>
+                      <option key={w.id} value={w.id}>{w.name || w.email}</option>
                     ))}
                   </select>
                   <button
@@ -354,7 +362,7 @@ export default function SupervisorDashboard() {
                     <ul className="list-disc ml-5 space-y-1">
                       {assignments.map(a => (
                         <li key={a.id} className="text-sm">
-                          {a.email ?? a.worker_id} — <span className="italic">{a.status.replace('_',' ')}</span>
+                          {a.name || a.email || a.worker_id} — <span className="italic">{a.status.replace('_',' ')}</span>
                         </li>
                       ))}
                     </ul>
