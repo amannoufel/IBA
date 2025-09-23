@@ -1,6 +1,7 @@
 -- Allow workers to view complaints that are assigned to them
 
-create policy if not exists "Workers can view assigned complaints" on complaints
+drop policy if exists "Workers can view assigned complaints" on complaints;
+create policy "Workers can view assigned complaints" on complaints
   for select to authenticated
   using (
     exists (

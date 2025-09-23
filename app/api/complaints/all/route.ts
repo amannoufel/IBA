@@ -53,7 +53,10 @@ export async function GET() {
       .order('created_at', { ascending: false })
 
     if (complaintsError) {
-      return NextResponse.json({ error: complaintsError.message }, { status: 400 })
+      console.error('Complaints fetch error:', complaintsError)
+      const maybeErr = complaintsError as unknown as { status?: number; message: string }
+      const status = typeof maybeErr.status === 'number' ? maybeErr.status : 400
+      return NextResponse.json({ error: complaintsError.message }, { status })
     }
 
     // If no complaints, return empty array
@@ -65,24 +68,35 @@ export async function GET() {
     const tenantIds = [...new Set(complaints.map(c => c.tenant_id))]
     const typeIds = [...new Set(complaints.map(c => c.type_id))]
 
-    // Fetch profiles for all tenants
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, email, name, building_name, room_number')
-      .in('id', tenantIds)
-
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError)
+    // Fetch profiles for all tenants (only if we have IDs)
+    let profiles: Array<{ id: string; email: string; name?: string | null; building_name?: string | null; room_number?: string | null }> | null = []
+    if (tenantIds.length > 0) {
+      const { data: p, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email, name, building_name, room_number')
+        .in('id', tenantIds)
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError)
+        profiles = []
+      } else {
+        profiles = p
+      }
     }
 
     // Fetch complaint types
-    const { data: complaintTypes, error: typesError } = await supabase
-      .from('complaint_types')
-      .select('id, name')
-      .in('id', typeIds)
-
-    if (typesError) {
-      console.error('Error fetching complaint types:', typesError)
+    // Fetch complaint types (only if we have IDs)
+    let complaintTypes: Array<{ id: number; name: string }> | null = []
+    if (typeIds.length > 0) {
+      const { data: t, error: typesError } = await supabase
+        .from('complaint_types')
+        .select('id, name')
+        .in('id', typeIds)
+      if (typesError) {
+        console.error('Error fetching complaint types:', typesError)
+        complaintTypes = []
+      } else {
+        complaintTypes = t
+      }
     }
 
     // Create lookup maps
