@@ -25,7 +25,11 @@ export async function GET() {
     }
     // Fallback to JWT user_metadata.role if profile missing
     if (!isSupervisor) {
-      const jwtRole = (user.user_metadata as any)?.role ? String((user.user_metadata as any).role).toLowerCase() : ''
+      const meta = user.user_metadata as Record<string, unknown> | null | undefined
+      let jwtRole = ''
+      if (meta && typeof (meta as Record<string, unknown>).role === 'string') {
+        jwtRole = String((meta as { role: string }).role).toLowerCase()
+      }
       if (jwtRole === 'supervisor') isSupervisor = true
     }
     if (!isSupervisor) {
