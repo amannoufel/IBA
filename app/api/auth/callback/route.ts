@@ -1,6 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import type { Database } from '../../../types/supabase'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -35,9 +36,10 @@ export async function GET(request: Request) {
     // Upsert the user profile with tenant fields when available
     try {
       const now = new Date().toISOString()
-      const payload: Record<string, any> = {
+      type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
+      const payload: ProfileUpdate = {
         id: user.id,
-        email: user.email,
+        email: user.email ?? '',
         role: user.user_metadata.role,
         updated_at: now,
       }

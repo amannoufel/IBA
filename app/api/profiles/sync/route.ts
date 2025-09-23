@@ -1,6 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import type { Database } from '../../../types/supabase'
 
 export async function POST() {
   const supabase = createRouteHandlerClient({ cookies })
@@ -10,8 +11,9 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const meta = user.user_metadata || {}
-    const payload: Record<string, any> = { updated_at: new Date().toISOString() }
+  const meta = user.user_metadata || {}
+  type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
+  const payload: ProfileUpdate = { updated_at: new Date().toISOString() }
     if (meta.role) payload.role = meta.role
     if (meta.mobile) payload.mobile = meta.mobile
     if (Object.prototype.hasOwnProperty.call(meta, 'building_name')) payload.building_name = meta.building_name ?? null
@@ -32,6 +34,7 @@ export async function POST() {
 
     return NextResponse.json({ message: 'Profile synced' })
   } catch (e) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    const msg = e instanceof Error ? e.message : 'Internal Server Error'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
