@@ -4,14 +4,45 @@ import { NextResponse } from 'next/server'
 
 export async function GET() {
   const supabase = createRouteHandlerClient({ cookies })
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  
+  // Get user info
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized', authError }, { status: 401 })
+  }
 
-  // Try a minimal select to see exact error
-  const { data, error } = await supabase
+  // Get user profile
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  // Test helper function if it exists
+  let helperResult = null
+  try {
+    const { data: helperData, error: helperError } = await supabase
+      .rpc('is_supervisor', { uid: user.id })
+    helperResult = { data: helperData, error: helperError }
+  } catch (e) {
+    helperResult = { error: `Helper function error: ${e}` }
+  }
+
+  // Try complaints query
+  const { data: complaints, error: complaintsError } = await supabase
     .from('complaints')
     .select('id')
     .limit(1)
 
-  return NextResponse.json({ data, error }, { status: error ? 400 : 200 })
+  return NextResponse.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      user_metadata: user.user_metadata
+    },
+    profile: { data: profile, error: profileError },
+    helperFunction: helperResult,
+    complaintsQuery: { data: complaints, error: complaintsError },
+    timestamp: new Date().toISOString()
+  })
 }
