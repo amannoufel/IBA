@@ -32,31 +32,42 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL('/?error=User role not found', request.url))
     }
 
-    // Create the user profile if it doesn't exist
+    // Upsert the user profile with tenant fields when available
     try {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: user.id,
-          email: user.email,
-          role: user.user_metadata.role,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          // Add tenant-specific fields if present in metadata
-          ...(user.user_metadata.mobile ? {
-            mobile: user.user_metadata.mobile,
-            building_name: user.user_metadata.building_name,
-            room_number: user.user_metadata.room_number
-          } : {})
-        }])
-        .single()
+      const now = new Date().toISOString()
+      const payload: Record<string, any> = {
+        id: user.id,
+        email: user.email,
+        role: user.user_metadata.role,
+        updated_at: now,
+      }
+      if (user.user_metadata?.mobile) {
+        payload.mobile = user.user_metadata.mobile
+        payload.building_name = user.user_metadata.building_name ?? null
+        payload.room_number = user.user_metadata.room_number ?? null
+      }
 
-      if (profileError && profileError.code !== '23505') { // Ignore unique constraint violations
-        console.error('Profile creation error:', profileError)
-        throw profileError
+      // Try update first; if no row, insert
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (existing?.id) {
+        const { error: updateErr } = await supabase
+          .from('profiles')
+          .update(payload)
+          .eq('id', user.id)
+        if (updateErr) throw updateErr
+      } else {
+        const { error: insertErr } = await supabase
+          .from('profiles')
+          .insert([{ ...payload, created_at: now }])
+        if (insertErr) throw insertErr
       }
     } catch (error) {
-      console.error('Failed to create profile:', error)
+      console.error('Failed to upsert profile:', error)
       return NextResponse.redirect(new URL('/?error=Failed to create user profile', request.url))
     }
 

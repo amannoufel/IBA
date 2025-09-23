@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
 
   const supabase = useSupabase()
 
@@ -24,6 +25,25 @@ export default function LoginPage() {
       setError(decodeURIComponent(errorMsg))
     }
   }, [])
+
+  const handleResend = async () => {
+    try {
+      setResending(true)
+      setError('')
+      const redirectTo = `${window.location.origin}/auth/callback`
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: redirectTo }
+      })
+      if (error) throw error
+      alert('A new confirmation email has been sent. Please check your inbox.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to resend confirmation email')
+    } finally {
+      setResending(false)
+    }
+  }
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -269,6 +289,18 @@ export default function LoginPage() {
               ? 'Already have an account? Sign in'
               : 'Don\'t have an account? Sign up'}
           </button>
+          {error?.includes('invalid') || error?.includes('expired') ? (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={!email || resending}
+                className="text-sm text-indigo-600 hover:text-indigo-500"
+              >
+                {resending ? 'Resending…' : 'Resend confirmation email'}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

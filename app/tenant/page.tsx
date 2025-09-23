@@ -61,6 +61,13 @@ export default function TenantDashboard() {
 
         setUser(user)
 
+        // Sync profile fields from user metadata (mobile, building_name, room_number)
+        try {
+          await fetch('/api/profiles/sync', { method: 'POST' })
+        } catch (e) {
+          console.warn('Profile sync skipped:', e)
+        }
+
         // Fetch complaint types
         const response = await fetch('/api/complaints')
         const types = await response.json()
