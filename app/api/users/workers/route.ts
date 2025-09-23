@@ -14,7 +14,8 @@ export async function GET() {
   const { data, error } = await supabase
     .from('profiles')
     .select('id, email, name')
-    .eq('role', 'WORKER')
+    // case-insensitive match to handle various stored cases
+    .ilike('role', 'worker')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json(data ?? [])
