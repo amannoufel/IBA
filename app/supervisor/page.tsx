@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSupabase } from '../lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -87,9 +87,14 @@ export default function SupervisorDashboard() {
     fetch(`/api/complaints/${complaint.id}/assignments`).then(async (r) => {
       if (!r.ok) return
       const data = await r.json()
-      setAssignments(
-        (data || []).map((a: any) => ({ id: a.id, worker_id: a.worker_id, status: a.status, email: a.profiles?.email }))
-      )
+      type RawAssignment = { id: number; worker_id: string; status: string; profiles?: { email?: string | null } | null }
+      const items: Array<{ id: number; worker_id: string; status: string; email?: string }>= ((data || []) as RawAssignment[]).map((a) => ({
+        id: a.id,
+        worker_id: a.worker_id,
+        status: a.status,
+        email: a.profiles?.email ?? undefined,
+      }))
+      setAssignments(items)
     })
   }
 
@@ -130,10 +135,9 @@ export default function SupervisorDashboard() {
       if (!res.ok) throw new Error('Failed to assign workers')
       const data = await res.json()
       // Merge new assignments into list
-      setAssignments((prev) => [
-        ...prev,
-        ...data.map((a: any) => ({ id: a.id, worker_id: a.worker_id, status: a.status }))
-      ])
+      type Inserted = { id: number; worker_id: string; status: string }
+      const appended: Inserted[] = (data || []) as Inserted[]
+      setAssignments((prev) => [...prev, ...appended.map((a) => ({ id: a.id, worker_id: a.worker_id, status: a.status }))])
       setSelectedWorkers([])
     } catch (e) {
       console.error(e)
