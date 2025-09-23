@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useSupabase } from '../lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -23,6 +23,10 @@ export default function SupervisorDashboard() {
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [workers, setWorkers] = useState<Array<{ id: string; email: string }>>([])
+  const [assigning, setAssigning] = useState(false)
+  const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
+  const [assignments, setAssignments] = useState<Array<{ id: number; worker_id: string; status: string; email?: string }>>([])
   const router = useRouter()
   const supabase = useSupabase()
 
@@ -36,7 +40,7 @@ export default function SupervisorDashboard() {
         }
         // Attempt to sync profile in case metadata changed
         try { await fetch('/api/profiles/sync', { method: 'POST' }) } catch {}
-        await fetchComplaints()
+        await Promise.all([fetchComplaints(), fetchWorkers()])
       } catch (error) {
         console.error('Error:', error)
         router.replace('/')
@@ -47,6 +51,18 @@ export default function SupervisorDashboard() {
     
     checkUser()
   }, [router, supabase])
+
+  const fetchWorkers = async () => {
+    try {
+      const res = await fetch('/api/users/workers')
+      if (res.ok) {
+        const data = await res.json()
+        setWorkers(data)
+      }
+    } catch (e) {
+      console.error('Failed to fetch workers', e)
+    }
+  }
 
   const fetchComplaints = async () => {
     try {
@@ -67,6 +83,14 @@ export default function SupervisorDashboard() {
   const handleViewComplaint = (complaint: Complaint) => {
     setSelectedComplaint(complaint)
     setIsModalOpen(true)
+    // Load current assignments for this complaint
+    fetch(`/api/complaints/${complaint.id}/assignments`).then(async (r) => {
+      if (!r.ok) return
+      const data = await r.json()
+      setAssignments(
+        (data || []).map((a: any) => ({ id: a.id, worker_id: a.worker_id, status: a.status, email: a.profiles?.email }))
+      )
+    })
   }
 
   const handleStatusUpdate = async (id: number, newStatus: string) => {
@@ -91,6 +115,30 @@ export default function SupervisorDashboard() {
       }
     } catch (error) {
       console.error('Error updating status:', error)
+    }
+  }
+
+  const handleAssign = async () => {
+    if (!selectedComplaint || selectedWorkers.length === 0) return
+    try {
+      setAssigning(true)
+      const res = await fetch(`/api/complaints/${selectedComplaint.id}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ worker_ids: selectedWorkers })
+      })
+      if (!res.ok) throw new Error('Failed to assign workers')
+      const data = await res.json()
+      // Merge new assignments into list
+      setAssignments((prev) => [
+        ...prev,
+        ...data.map((a: any) => ({ id: a.id, worker_id: a.worker_id, status: a.status }))
+      ])
+      setSelectedWorkers([])
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setAssigning(false)
     }
   }
 
@@ -272,6 +320,43 @@ export default function SupervisorDashboard() {
               )}
 
               <div className="mt-6">
+                {/* Assign to workers */}
+                <p className="text-sm font-medium text-gray-500 mb-2">Assign to Workers</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <select
+                    multiple
+                    value={selectedWorkers}
+                    onChange={(e) => {
+                      const opts = Array.from(e.target.selectedOptions).map(o => o.value)
+                      setSelectedWorkers(opts)
+                    }}
+                    className="border rounded p-2 min-w-[240px] h-24"
+                  >
+                    {workers.map(w => (
+                      <option key={w.id} value={w.id}>{w.email}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleAssign}
+                    disabled={assigning || selectedWorkers.length === 0}
+                    className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${assigning ? 'opacity-50' : 'hover:bg-indigo-700'}`}
+                  >
+                    {assigning ? 'Assigning…' : 'Assign'}
+                  </button>
+                </div>
+                {assignments.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-sm font-medium text-gray-500 mb-1">Current Assignments</p>
+                    <ul className="list-disc ml-5 space-y-1">
+                      {assignments.map(a => (
+                        <li key={a.id} className="text-sm">
+                          {a.email ?? a.worker_id} — <span className="italic">{a.status.replace('_',' ')}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <p className="text-sm font-medium text-gray-500 mb-2">Update Status</p>
                 <div className="flex flex-wrap gap-2">
                   <button
