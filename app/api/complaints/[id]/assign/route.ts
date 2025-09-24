@@ -1,11 +1,11 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import type { Database } from '../../../../types/supabase'
 
 export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request,
+  { params }: { params: Record<string, string> }
 ) {
   const supabase = createRouteHandlerClient<Database>({ cookies })
   const { data: { user } } = await supabase.auth.getUser()
@@ -14,7 +14,7 @@ export async function POST(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { id } = await params
+  const { id } = params
   const complaintId = Number(id)
   if (Number.isNaN(complaintId)) return NextResponse.json({ error: 'Invalid complaint id' }, { status: 400 })
 

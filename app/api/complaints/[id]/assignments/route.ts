@@ -5,7 +5,7 @@ import type { Database } from '../../../../types/supabase'
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Record<string, string> }
 ) {
   const supabase = createRouteHandlerClient<Database>({ cookies })
   const { data: { user } } = await supabase.auth.getUser()
