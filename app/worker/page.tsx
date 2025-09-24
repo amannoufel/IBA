@@ -40,6 +40,8 @@ export default function WorkerDashboard() {
         }
 
         setUser(user)
+        // Sync profile fields from user metadata (e.g., name) after sign-in
+        try { await fetch('/api/profiles/sync', { method: 'POST' }) } catch {}
         await fetchAssignments()
       } catch (error) {
         console.error('Unexpected error:', error)
