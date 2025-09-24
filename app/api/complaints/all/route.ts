@@ -20,7 +20,7 @@ export async function GET() {
       if (!helperError && helperResult === true) {
         isSupervisor = true
       }
-    } catch (e) {
+    } catch {
       // Helper function might not exist yet, try JWT fallback
     }
     

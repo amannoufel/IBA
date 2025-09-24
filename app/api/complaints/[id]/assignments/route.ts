@@ -36,31 +36,52 @@ export async function GET(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
+  // Types for safe normalization
+  type Profile = { email?: string | null; name?: string | null } | null
+  type DetailRow = {
+    store_id: number | null
+    time_in: string | null
+    time_out: string | null
+    needs_revisit: boolean | null
+    stores?: { name?: string | null } | null
+  }
+  type MaterialRow = { material_id: number; materials?: { name?: string | null } | null }
+  type Row = {
+    id: number
+    worker_id: string
+    status: string
+    created_at: string
+    updated_at: string
+    profiles?: Profile
+    assignment_details?: DetailRow[] | null
+    assignment_materials?: MaterialRow[] | null
+  }
+
   // Normalize embedded arrays/objects for the UI
-  const normalized = (data ?? []).map((row: any) => {
-    const detailArr = row.assignment_details as Array<any> | null | undefined
+  const normalized = (data as Row[] | null | undefined ?? []).map((row) => {
+    const detailArr = row.assignment_details ?? []
     const detail = Array.isArray(detailArr) && detailArr.length > 0 ? detailArr[0] : null
-    const matsArr = (row.assignment_materials as Array<any> | null | undefined) ?? []
+    const matsArr = row.assignment_materials ?? []
     const materials = matsArr
-      .map((m) => m?.materials?.name)
-      .filter((n: any) => typeof n === 'string')
+      .map((m) => m.materials?.name ?? null)
+      .filter((n): n is string => typeof n === 'string')
     return {
-      id: row.id as number,
-      worker_id: row.worker_id as string,
-      status: row.status as string,
-      created_at: row.created_at as string,
-      updated_at: row.updated_at as string,
+      id: row.id,
+      worker_id: row.worker_id,
+      status: row.status,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
       profiles: row.profiles ?? null,
       detail: detail
         ? {
-            store_id: detail.store_id as number | null,
+            store_id: detail.store_id,
             store_name: detail.stores?.name ?? null,
-            time_in: detail.time_in as string | null,
-            time_out: detail.time_out as string | null,
+            time_in: detail.time_in,
+            time_out: detail.time_out,
             needs_revisit: Boolean(detail.needs_revisit),
             materials,
           }
-        : { store_id: null, store_name: null, time_in: null, time_out: null, needs_revisit: false, materials: materials as string[] },
+        : { store_id: null, store_name: null, time_in: null, time_out: null, needs_revisit: false, materials },
     }
   })
 

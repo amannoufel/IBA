@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSupabase } from '../lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
@@ -16,6 +16,18 @@ export default function WorkerDashboard() {
   const [detail, setDetail] = useState<{ store_id: number | null; materials: number[]; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null>(null)
   const router = useRouter()
   const supabase = useSupabase()
+
+  const fetchAssignments = useCallback(async () => {
+    try {
+      const res = await fetch('/api/assignments/mine')
+      if (res.ok) {
+        const data = await res.json() as Assignment[]
+        setAssignments(data)
+      }
+    } catch (e) {
+      console.error('Failed to fetch assignments', e)
+    }
+  }, [])
 
   useEffect(() => {
     const checkUser = async () => {
@@ -48,26 +60,16 @@ export default function WorkerDashboard() {
         setUser(user)
         // Sync profile fields from user metadata (e.g., name) after sign-in
         try { await fetch('/api/profiles/sync', { method: 'POST' }) } catch {}
-        await fetchAssignments()
+  await fetchAssignments()
       } catch (error) {
         console.error('Unexpected error:', error)
         router.replace('/')
       }
     }
     checkUser()
-  }, [router, supabase])
+  }, [router, supabase, fetchAssignments])
 
-  const fetchAssignments = async () => {
-    try {
-      const res = await fetch('/api/assignments/mine')
-      if (res.ok) {
-        const data = await res.json() as Assignment[]
-        setAssignments(data)
-      }
-    } catch (e) {
-      console.error('Failed to fetch assignments', e)
-    }
-  }
+  
 
   const updateAssignmentStatus = async (id: number, status: string) => {
     try {
