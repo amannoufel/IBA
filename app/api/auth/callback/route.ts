@@ -38,6 +38,38 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL('/?error=User role not found', request.url))
     }
 
+    // Helper: best-effort derive a display name from user metadata / identities
+    const deriveName = (u: { email: string | null; user_metadata?: Record<string, unknown> | null | undefined; identities?: Array<{ identity_data?: Record<string, unknown> | null }> | null | undefined; }) => {
+      const meta = (u.user_metadata ?? {}) as Record<string, unknown>
+      const pick = (...keys: string[]) => keys.map(k => meta[k]).find(v => typeof v === 'string' && (v as string).trim().length > 0) as string | undefined
+      let name: string | undefined
+      // Common provider fields
+      name = pick('name', 'full_name', 'preferred_username', 'user_name', 'nickname')
+      if (!name) {
+        const given = typeof meta['given_name'] === 'string' ? (meta['given_name'] as string).trim() : ''
+        const family = typeof meta['family_name'] === 'string' ? (meta['family_name'] as string).trim() : ''
+        const combined = `${given} ${family}`.trim()
+        if (combined.length > 0) name = combined
+      }
+      if (!name && Array.isArray(u.identities)) {
+        for (const ident of u.identities) {
+          const idData = ident?.identity_data as Record<string, unknown> | null | undefined
+          if (!idData) continue
+          const idPick = (...keys: string[]) => keys.map(k => idData[k]).find(v => typeof v === 'string' && (v as string).trim().length > 0) as string | undefined
+          name = idPick('name', 'full_name', 'preferred_username', 'user_name', 'nickname')
+          if (name) break
+          const g = typeof idData['given_name'] === 'string' ? (idData['given_name'] as string).trim() : ''
+          const f = typeof idData['family_name'] === 'string' ? (idData['family_name'] as string).trim() : ''
+          const comb = `${g} ${f}`.trim()
+          if (comb.length > 0) { name = comb; break }
+        }
+      }
+      if (!name && u.email) {
+        name = u.email.split('@')[0]
+      }
+      return name ?? null
+    }
+
     // Upsert the user profile with tenant fields when available
     try {
       const now = new Date().toISOString()
@@ -51,8 +83,11 @@ export async function GET(request: Request) {
       if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'mobile')) {
         payload.mobile = (user.user_metadata as Record<string, unknown>).mobile as string | null
       }
+      // Prefer explicit 'name' if present; else derive
       if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'name')) {
         payload.name = (user.user_metadata as Record<string, unknown>).name as string | null
+      } else {
+        payload.name = deriveName(user as unknown as { email: string | null; user_metadata?: Record<string, unknown>; identities?: Array<{ identity_data?: Record<string, unknown> }> })
       }
       if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'building_name')) {
         payload.building_name = (user.user_metadata as Record<string, unknown>).building_name as string | null
