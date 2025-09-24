@@ -334,27 +334,68 @@ export default function SupervisorDashboard() {
               <div className="mt-6">
                 {/* Assign to workers */}
                 <p className="text-sm font-medium text-gray-500 mb-2">Assign to Workers</p>
-                <div className="flex items-center gap-2 mb-2">
-                  <select
-                    multiple
-                    value={selectedWorkers}
-                    onChange={(e) => {
-                      const opts = Array.from(e.target.selectedOptions).map(o => o.value)
-                      setSelectedWorkers(opts)
-                    }}
-                    className="border rounded p-2 min-w-[240px] h-24"
-                  >
-                    {workers.map(w => (
-                      <option key={w.id} value={w.id}>{w.name || w.email}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleAssign}
-                    disabled={assigning || selectedWorkers.length === 0}
-                    className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${assigning ? 'opacity-50' : 'hover:bg-indigo-700'}`}
-                  >
-                    {assigning ? 'Assigning…' : 'Assign'}
-                  </button>
+                <div className="mb-2 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="border rounded p-2 min-w-[260px] max-w-[480px] max-h-40 overflow-auto">
+                      {workers.length === 0 ? (
+                        <p className="text-sm text-gray-500">No workers available</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {workers.map((w) => {
+                            const checked = selectedWorkers.includes(w.id)
+                            return (
+                              <li key={w.id} className="flex items-center gap-2">
+                                <input
+                                  id={`w-${w.id}`}
+                                  type="checkbox"
+                                  className="h-4 w-4"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    setSelectedWorkers((prev) =>
+                                      e.target.checked
+                                        ? Array.from(new Set([...prev, w.id]))
+                                        : prev.filter((id) => id !== w.id)
+                                    )
+                                  }}
+                                />
+                                <label htmlFor={`w-${w.id}`} className="text-sm cursor-pointer select-none">
+                                  {w.name || w.email}
+                                </label>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={handleAssign}
+                        disabled={assigning || selectedWorkers.length === 0}
+                        className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${assigning ? 'opacity-50' : 'hover:bg-indigo-700'}`}
+                      >
+                        {assigning ? 'Assigning…' : 'Assign'}
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedWorkers(workers.map((w) => w.id))}
+                          className="px-2 py-1 text-xs rounded border bg-white text-gray-700 hover:bg-gray-50"
+                          disabled={workers.length === 0}
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedWorkers([])}
+                          className="px-2 py-1 text-xs rounded border bg-white text-gray-700 hover:bg-gray-50"
+                          disabled={selectedWorkers.length === 0}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500">Selected: {selectedWorkers.length}</p>
+                    </div>
+                  </div>
                 </div>
                 {assignments.length > 0 && (
                   <div className="mt-2">
