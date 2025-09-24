@@ -12,42 +12,10 @@ export async function POST() {
     }
 
   const meta = user.user_metadata || {}
-  const deriveName = (u: { email: string | null; user_metadata?: Record<string, unknown> | null | undefined; identities?: Array<{ identity_data?: Record<string, unknown> | null }> | null | undefined; }) => {
-    const m = (u.user_metadata ?? {}) as Record<string, unknown>
-    const pick = (...keys: string[]) => keys.map(k => m[k]).find(v => typeof v === 'string' && (v as string).trim().length > 0) as string | undefined
-    let name: string | undefined
-    name = pick('name', 'full_name', 'preferred_username', 'user_name', 'nickname')
-    if (!name) {
-      const given = typeof m['given_name'] === 'string' ? (m['given_name'] as string).trim() : ''
-      const family = typeof m['family_name'] === 'string' ? (m['family_name'] as string).trim() : ''
-      const combined = `${given} ${family}`.trim()
-      if (combined.length > 0) name = combined
-    }
-    if (!name && Array.isArray(u.identities)) {
-      for (const ident of u.identities) {
-        const idData = ident?.identity_data as Record<string, unknown> | null | undefined
-        if (!idData) continue
-        const idPick = (...keys: string[]) => keys.map(k => idData[k]).find(v => typeof v === 'string' && (v as string).trim().length > 0) as string | undefined
-        name = idPick('name', 'full_name', 'preferred_username', 'user_name', 'nickname')
-        if (name) break
-        const g = typeof idData['given_name'] === 'string' ? (idData['given_name'] as string).trim() : ''
-        const f = typeof idData['family_name'] === 'string' ? (idData['family_name'] as string).trim() : ''
-        const comb = `${g} ${f}`.trim()
-        if (comb.length > 0) { name = comb; break }
-      }
-    }
-    if (!name && u.email) {
-      name = u.email.split('@')[0]
-    }
-    return name ?? null
-  }
   type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
   const payload: ProfileUpdate = { updated_at: new Date().toISOString() }
     if (meta.role) payload.role = meta.role
     if (Object.prototype.hasOwnProperty.call(meta, 'name')) payload.name = meta.name ?? null
-    if (!Object.prototype.hasOwnProperty.call(meta, 'name')) {
-      payload.name = deriveName(user as unknown as { email: string | null; user_metadata?: Record<string, unknown>; identities?: Array<{ identity_data?: Record<string, unknown> }> })
-    }
     if (meta.mobile) payload.mobile = meta.mobile
     if (Object.prototype.hasOwnProperty.call(meta, 'building_name')) payload.building_name = meta.building_name ?? null
     if (Object.prototype.hasOwnProperty.call(meta, 'room_number')) payload.room_number = meta.room_number ?? null
@@ -76,7 +44,7 @@ export async function POST() {
         id: user.id,
         email: user.email ?? '',
         role: (meta.role as string) || 'supervisor',
-        name: (Object.prototype.hasOwnProperty.call(meta, 'name') ? (meta.name as string | null) : null) ?? deriveName(user as unknown as { email: string | null; user_metadata?: Record<string, unknown>; identities?: Array<{ identity_data?: Record<string, unknown> }> }) ?? null,
+  name: (Object.prototype.hasOwnProperty.call(meta, 'name') ? (meta.name as string | null) : null) ?? null,
         mobile: (meta.mobile as string | undefined) ?? null,
         building_name: (Object.prototype.hasOwnProperty.call(meta, 'building_name') ? (meta.building_name as string | null) : null) ?? null,
         room_number: (Object.prototype.hasOwnProperty.call(meta, 'room_number') ? (meta.room_number as string | null) : null) ?? null,
