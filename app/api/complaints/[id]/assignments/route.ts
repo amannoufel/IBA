@@ -5,7 +5,7 @@ import type { Database } from '../../../../types/supabase'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   const supabase = createRouteHandlerClient<Database>({ cookies })
   const { data: { user } } = await supabase.auth.getUser()
@@ -14,7 +14,7 @@ export async function GET(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { id } = await params
+  const { id } = params
   const complaintId = Number(id)
   if (Number.isNaN(complaintId)) return NextResponse.json({ error: 'Invalid complaint id' }, { status: 400 })
 
@@ -25,11 +25,11 @@ export async function GET(
       profiles:worker_id (email, name),
       assignment_details:assignment_details (
         store_id, time_in, time_out, needs_revisit,
-        stores:store_id (name)
-      ),
-      assignment_materials:assignment_materials (
-        material_id,
-        materials:material_id (name)
+        stores:store_id (name),
+        assignment_materials:assignment_materials (
+          material_id,
+          materials:material_id (name)
+        )
       )
     `)
     .eq('complaint_id', complaintId)
@@ -53,16 +53,15 @@ export async function GET(
     created_at: string
     updated_at: string
     profiles?: Profile
-    assignment_details?: DetailRow[] | null
-    assignment_materials?: MaterialRow[] | null
+    assignment_details?: (DetailRow & { assignment_materials?: MaterialRow[] | null })[] | null
   }
 
   // Normalize embedded arrays/objects for the UI
   const normalized = (data as Row[] | null | undefined ?? []).map((row) => {
     const detailArr = row.assignment_details ?? []
     const detail = Array.isArray(detailArr) && detailArr.length > 0 ? detailArr[0] : null
-    const matsArr = row.assignment_materials ?? []
-    const materials = matsArr
+    const matsArr = detail?.assignment_materials ?? []
+    const materials = (matsArr as MaterialRow[])
       .map((m) => m.materials?.name ?? null)
       .filter((n): n is string => typeof n === 'string')
     return {
