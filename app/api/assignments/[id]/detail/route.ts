@@ -1,16 +1,16 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
-  _request: Request,
-  { params }: { params: any }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createRouteHandlerClient({ cookies })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id: idParam } = params
+  const { id: idParam } = await params
   const assignmentId = Number(idParam)
   if (Number.isNaN(assignmentId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
@@ -44,14 +44,14 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: any }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createRouteHandlerClient({ cookies })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id: idParam } = params
+  const { id: idParam } = await params
   const assignmentId = Number(idParam)
   if (Number.isNaN(assignmentId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
