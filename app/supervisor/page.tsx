@@ -27,7 +27,21 @@ export default function SupervisorDashboard() {
   const [workers, setWorkers] = useState<Array<{ id: string; email: string; name?: string | null }>>([])
   const [assigning, setAssigning] = useState(false)
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
-  const [assignments, setAssignments] = useState<Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null }>>([])
+  const [assignments, setAssignments] = useState<Array<{
+    id: number;
+    worker_id: string;
+    status: string;
+    email?: string;
+    name?: string | null;
+    detail?: {
+      store_id: number | null;
+      store_name: string | null;
+      time_in: string | null;
+      time_out: string | null;
+      needs_revisit: boolean;
+      materials: string[];
+    };
+  }>>([])
   const router = useRouter()
   const supabase = useSupabase()
 
@@ -88,13 +102,18 @@ export default function SupervisorDashboard() {
     fetch(`/api/complaints/${complaint.id}/assignments`).then(async (r) => {
       if (!r.ok) return
       const data = await r.json()
-      type RawAssignment = { id: number; worker_id: string; status: string; profiles?: { email?: string | null; name?: string | null } | null }
-      const items: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null }>= ((data || []) as RawAssignment[]).map((a) => ({
+      type RawAssignment = {
+        id: number; worker_id: string; status: string;
+        profiles?: { email?: string | null; name?: string | null } | null;
+        detail?: { store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }
+      }
+      const items: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null; detail?: RawAssignment['detail'] }>= ((data || []) as RawAssignment[]).map((a) => ({
         id: a.id,
         worker_id: a.worker_id,
         status: a.status,
         email: a.profiles?.email ?? undefined,
         name: a.profiles?.name ?? undefined,
+        detail: a.detail,
       }))
       setAssignments(items)
     })
@@ -399,11 +418,41 @@ export default function SupervisorDashboard() {
                 </div>
                 {assignments.length > 0 && (
                   <div className="mt-2">
-                    <p className="text-sm font-medium text-gray-500 mb-1">Current Assignments</p>
-                    <ul className="list-disc ml-5 space-y-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium text-gray-500">Current Assignments</p>
+                      <button
+                        type="button"
+                        onClick={() => selectedComplaint && handleViewComplaint(selectedComplaint)}
+                        className="text-xs text-indigo-600 hover:text-indigo-800"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                    <ul className="space-y-2">
                       {assignments.map(a => (
-                        <li key={a.id} className="text-sm">
-                          {a.name || a.email || a.worker_id} — <span className="italic">{a.status.replace('_',' ')}</span>
+                        <li key={a.id} className="text-sm border rounded p-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium">{a.name || a.email || a.worker_id}</span>
+                            <span className="text-xs italic">{a.status.replace('_',' ')}</span>
+                          </div>
+                          {a.detail ? (
+                            <div className="mt-1 text-xs text-gray-600 space-y-0.5">
+                              <div>
+                                <span className="font-medium">Store:</span> {a.detail.store_name || '—'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Materials:</span> {a.detail.materials?.length ? a.detail.materials.join(', ') : '—'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Time:</span> {a.detail.time_in ? new Date(a.detail.time_in).toLocaleString() : '—'} → {a.detail.time_out ? new Date(a.detail.time_out).toLocaleString() : '—'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Revisit:</span> {a.detail.needs_revisit ? 'Yes' : 'No'}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-xs text-gray-500">No details saved yet.</div>
+                          )}
                         </li>
                       ))}
                     </ul>
