@@ -8,7 +8,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore as any })
     const { id } = await params
     
     // Check if user is authenticated and is supervisor

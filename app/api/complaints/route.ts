@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server'
 import type { Database } from '../../types/supabase'
 
 export async function POST(request: Request) {
-  const supabase = createRouteHandlerClient<Database>({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore as any })
 
   try {
     // Verify user is authenticated
@@ -98,7 +99,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any })
 
   try {
     // Get complaint types

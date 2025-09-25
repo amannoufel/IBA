@@ -11,7 +11,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/?error=No authentication code provided', request.url))
   }
 
-  const supabase = createRouteHandlerClient({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any })
   
   try {
     // Exchange the code for a session

@@ -33,6 +33,7 @@ export default function SupervisorDashboard() {
     status: string;
     email?: string;
     name?: string | null;
+    is_leader?: boolean;
     detail?: {
       store_id: number | null;
       store_name: string | null;
@@ -42,6 +43,7 @@ export default function SupervisorDashboard() {
       materials: string[];
     };
   }>>([])
+  const [leaderSelection, setLeaderSelection] = useState<string | null>(null)
   const router = useRouter()
   const supabase = useSupabase()
 
@@ -103,19 +105,23 @@ export default function SupervisorDashboard() {
       if (!r.ok) return
       const data = await r.json()
       type RawAssignment = {
-        id: number; worker_id: string; status: string;
+        id: number; worker_id: string; status: string; is_leader?: boolean;
         profiles?: { email?: string | null; name?: string | null } | null;
         detail?: { store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }
       }
-      const items: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null; detail?: RawAssignment['detail'] }>= ((data || []) as RawAssignment[]).map((a) => ({
+      const items: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null; is_leader?: boolean; detail?: RawAssignment['detail'] }>= ((data || []) as RawAssignment[]).map((a) => ({
         id: a.id,
         worker_id: a.worker_id,
         status: a.status,
+        is_leader: !!a.is_leader,
         email: a.profiles?.email ?? undefined,
         name: a.profiles?.name ?? undefined,
         detail: a.detail,
       }))
       setAssignments(items)
+      // If there is an existing leader set it in local state
+      const existingLeader = items.find(i => i.is_leader)
+      setLeaderSelection(existingLeader ? existingLeader.worker_id : null)
     })
   }
 
@@ -151,14 +157,19 @@ export default function SupervisorDashboard() {
       const res = await fetch(`/api/complaints/${selectedComplaint.id}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ worker_ids: selectedWorkers })
+        body: JSON.stringify({ worker_ids: selectedWorkers, leader_id: leaderSelection })
       })
       if (!res.ok) throw new Error('Failed to assign workers')
       const data = await res.json()
       // Merge new assignments into list
-      type Inserted = { id: number; worker_id: string; status: string }
+      type Inserted = { id: number; worker_id: string; status: string; is_leader?: boolean }
       const appended: Inserted[] = (data || []) as Inserted[]
-      setAssignments((prev) => [...prev, ...appended.map((a) => ({ id: a.id, worker_id: a.worker_id, status: a.status }))])
+      setAssignments((prev) => {
+        const merged = [...prev, ...appended.map((a) => ({ id: a.id, worker_id: a.worker_id, status: a.status, is_leader: !!a.is_leader }))]
+        const existingLeader = merged.find(m => m.is_leader)
+        setLeaderSelection(existingLeader ? existingLeader.worker_id : leaderSelection)
+        return merged
+      })
       setSelectedWorkers([])
     } catch (e) {
       console.error(e)
@@ -370,16 +381,33 @@ export default function SupervisorDashboard() {
                                   className="h-4 w-4"
                                   checked={checked}
                                   onChange={(e) => {
-                                    setSelectedWorkers((prev) =>
-                                      e.target.checked
+                                    setSelectedWorkers((prev) => {
+                                      const next = e.target.checked
                                         ? Array.from(new Set([...prev, w.id]))
                                         : prev.filter((id) => id !== w.id)
-                                    )
+                                      // If leader not in next selection, clear leaderSelection (unless already committed in assignments)
+                                      if (leaderSelection && !next.includes(leaderSelection)) {
+                                        // keep existing leader if already assigned previously
+                                        const existingLeaderPersisted = assignments.find(a => a.is_leader)?.worker_id
+                                        setLeaderSelection(existingLeaderPersisted && next.includes(existingLeaderPersisted) ? existingLeaderPersisted : null)
+                                      }
+                                      return next
+                                    })
                                   }}
                                 />
-                                <label htmlFor={`w-${w.id}`} className="text-sm cursor-pointer select-none">
+                                <label htmlFor={`w-${w.id}`} className="flex-1 text-sm cursor-pointer select-none">
                                   {w.name || w.email}
                                 </label>
+                                <input
+                                  type="radio"
+                                  name="leader"
+                                  title="Leader"
+                                  disabled={!checked || !!assignments.find(a => a.is_leader) && leaderSelection !== w.id}
+                                  className="h-4 w-4"
+                                  checked={leaderSelection === w.id}
+                                  onChange={() => setLeaderSelection(w.id)}
+                                />
+                                <span className="text-[10px] text-gray-500">Leader</span>
                               </li>
                             )
                           })}
@@ -412,7 +440,7 @@ export default function SupervisorDashboard() {
                           Clear
                         </button>
                       </div>
-                      <p className="text-xs text-gray-500">Selected: {selectedWorkers.length}</p>
+                      <p className="text-xs text-gray-500">Selected: {selectedWorkers.length} {leaderSelection && <span className="ml-2 inline-block px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded">Leader chosen</span>}</p>
                     </div>
                   </div>
                 </div>
@@ -433,6 +461,7 @@ export default function SupervisorDashboard() {
                         <li key={a.id} className="text-sm border rounded p-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium">{a.name || a.email || a.worker_id}</span>
+                            {a.is_leader && <span className="px-1.5 py-0.5 text-[10px] rounded bg-indigo-600 text-white">Leader</span>}
                             <span className="text-xs italic">{a.status.replace('_',' ')}</span>
                           </div>
                           {a.detail ? (

@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server'
 import type { Database } from '../../../types/supabase'
 
 export async function POST() {
-  const supabase = createRouteHandlerClient({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any })
   try {
     const { data: { user }, error } = await supabase.auth.getUser()
     if (error || !user) {

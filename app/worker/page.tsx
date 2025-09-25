@@ -7,7 +7,7 @@ import { User } from '@supabase/supabase-js'
 
 export default function WorkerDashboard() {
   const [user, setUser] = useState<User | null>(null)
-  type Assignment = { id: number; status: string; created_at: string; complaint: { id: number; description: string; status: string; created_at: string } }
+  type Assignment = { id: number; status: string; created_at: string; is_leader?: boolean; complaint: { id: number; description: string; status: string; created_at: string } }
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [selected, setSelected] = useState<Assignment | null>(null)
   const [stores, setStores] = useState<Array<{ id: number; name: string }>>([])
@@ -187,6 +187,7 @@ export default function WorkerDashboard() {
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leader</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
@@ -198,6 +199,9 @@ export default function WorkerDashboard() {
                           <td className="px-4 py-2 text-sm">{a.complaint.description}</td>
                           <td className="px-4 py-2 text-sm">
                             <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">{a.status.replace('_',' ')}</span>
+                          </td>
+                          <td className="px-4 py-2 text-sm">
+                            {a.is_leader ? <span className="text-green-600 font-semibold text-xs">Yes</span> : <span className="text-gray-400 text-xs">No</span>}
                           </td>
                           <td className="px-4 py-2 text-sm">
                             <button
@@ -214,7 +218,6 @@ export default function WorkerDashboard() {
                 </div>
               )}
             </div>
-
             <div className="bg-white shadow rounded-lg p-4">
               <h2 className="text-lg font-medium mb-3">Job Details</h2>
               {!selected ? (
@@ -225,12 +228,18 @@ export default function WorkerDashboard() {
                     <p className="text-sm text-gray-500">Complaint #{selected.complaint.id}</p>
                     <p className="font-medium">{selected.complaint.description}</p>
                   </div>
+                  {!selected.is_leader && (
+                    <div className="p-2 text-xs bg-yellow-50 border border-yellow-200 text-yellow-700 rounded">
+                      Only the designated leader can edit job details. You can still update assignment status.
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Store</label>
                     <select
                       value={detail?.store_id ?? ''}
+                      disabled={!selected.is_leader}
                       onChange={(e) => setDetail((d) => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), store_id: e.target.value ? Number(e.target.value) : null }))}
-                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md"
+                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md disabled:opacity-60"
                     >
                       <option value="">Select store</option>
                       {stores.map((s) => (
@@ -244,9 +253,10 @@ export default function WorkerDashboard() {
                       {materials.map((m) => {
                         const checked = detail?.materials?.includes(m.id) ?? false
                         return (
-                          <label key={m.id} className="flex items-center gap-2 text-sm">
+                          <label key={m.id} className={`flex items-center gap-2 text-sm ${!selected.is_leader ? 'opacity-60' : ''}`}>
                             <input
                               type="checkbox"
+                              disabled={!selected.is_leader}
                               checked={checked}
                               onChange={(e) => setDetail((d) => {
                                 const base = d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }
@@ -266,18 +276,20 @@ export default function WorkerDashboard() {
                       <label className="block text-sm font-medium text-gray-700">Time In</label>
                       <input
                         type="datetime-local"
+                        disabled={!selected.is_leader}
                         value={detail?.time_in ? new Date(detail.time_in).toISOString().slice(0,16) : ''}
                         onChange={(e) => setDetail((d) => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), time_in: e.target.value ? new Date(e.target.value).toISOString() : null }))}
-                        className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md"
+                        className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md disabled:opacity-60"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Time Out</label>
                       <input
                         type="datetime-local"
+                        disabled={!selected.is_leader}
                         value={detail?.time_out ? new Date(detail.time_out).toISOString().slice(0,16) : ''}
                         onChange={(e) => setDetail((d) => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), time_out: e.target.value ? new Date(e.target.value).toISOString() : null }))}
-                        className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md"
+                        className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md disabled:opacity-60"
                       />
                     </div>
                   </div>
@@ -285,6 +297,7 @@ export default function WorkerDashboard() {
                     <input
                       id="needs-revisit"
                       type="checkbox"
+                      disabled={!selected.is_leader}
                       checked={detail?.needs_revisit ?? false}
                       onChange={(e) => setDetail((d) => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), needs_revisit: e.target.checked }))}
                     />
@@ -293,8 +306,8 @@ export default function WorkerDashboard() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={saveDetail}
-                      disabled={saving}
-                      className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${saving ? 'opacity-50' : 'hover:bg-indigo-700'}`}
+                      disabled={saving || !selected.is_leader}
+                      className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${saving || !selected.is_leader ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
                     >
                       {saving ? 'Saving…' : 'Save'}
                     </button>
@@ -302,7 +315,7 @@ export default function WorkerDashboard() {
                       {['accepted','in_progress','completed','rejected'].map(s => (
                         <button
                           key={s}
-                          onClick={() => updateAssignmentStatus(selected.id, s)}
+                          onClick={() => selected && updateAssignmentStatus(selected.id, s)}
                           className={`px-2 py-1 text-xs rounded border ${selected.status === s ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
                         >
                           {s.replace('_',' ')}

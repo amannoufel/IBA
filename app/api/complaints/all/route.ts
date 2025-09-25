@@ -3,7 +3,8 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any })
 
   try {
     // Verify user is authenticated

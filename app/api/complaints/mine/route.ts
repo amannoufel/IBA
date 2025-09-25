@@ -7,7 +7,8 @@ type ComplaintRow = Database['public']['Tables']['complaints']['Row']
 type ComplaintSubset = Pick<ComplaintRow, 'id' | 'type_id' | 'description' | 'status' | 'image_path' | 'created_at'>
 
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any })
 
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()

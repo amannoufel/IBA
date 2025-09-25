@@ -3,7 +3,8 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore as any })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (user.user_metadata?.role?.toLowerCase() !== 'worker') {
@@ -12,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('complaint_assignments')
-    .select('id, status, created_at, updated_at, complaint:complaint_id (id, description, status, created_at)')
+    .select('id, status, created_at, updated_at, is_leader, complaint:complaint_id (id, description, status, created_at)')
     .eq('worker_id', user.id)
     .order('created_at', { ascending: false })
 

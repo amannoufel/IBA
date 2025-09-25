@@ -7,7 +7,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createRouteHandlerClient<Database>({ cookies })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore as any })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

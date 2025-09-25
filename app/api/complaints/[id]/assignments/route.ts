@@ -7,7 +7,9 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createRouteHandlerClient<Database>({ cookies })
+  // Next.js 15 requires awaiting cookies() when first accessed inside an async handler
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore as any })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (user.user_metadata?.role?.toLowerCase() !== 'supervisor') {
@@ -21,7 +23,7 @@ export async function GET(
   const { data, error } = await supabase
     .from('complaint_assignments')
     .select(`
-      id, worker_id, status, created_at, updated_at,
+      id, worker_id, status, created_at, updated_at, is_leader,
       profiles:worker_id (email, name),
       assignment_details:assignment_details (
         store_id, time_in, time_out, needs_revisit,
@@ -52,6 +54,7 @@ export async function GET(
     status: string
     created_at: string
     updated_at: string
+    is_leader?: boolean | null
     profiles?: Profile
     assignment_details?: (DetailRow & { assignment_materials?: MaterialRow[] | null })[] | null
   }
@@ -71,6 +74,7 @@ export async function GET(
       created_at: row.created_at,
       updated_at: row.updated_at,
       profiles: row.profiles ?? null,
+      is_leader: !!row.is_leader,
       detail: detail
         ? {
             store_id: detail.store_id,
