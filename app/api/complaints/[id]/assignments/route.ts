@@ -8,8 +8,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   // Next.js 15 requires awaiting cookies() when first accessed inside an async handler
-  const cookieStore = await cookies()
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore as any })
+  const cookieStore = cookies()
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (user.user_metadata?.role?.toLowerCase() !== 'supervisor') {
@@ -46,6 +46,7 @@ export async function GET(
   const assignmentIds = rows.map(r => r.id)
 
   // 2) Fetch details for these assignments (with store name)
+  type DetailRow = { assignment_id: number; store_id: number | null; time_in: string | null; time_out: string | null; needs_revisit: boolean | null; stores?: { name?: string | null } | null }
   const { data: details, error: detErr } = await supabase
     .from('assignment_details')
     .select('assignment_id, store_id, time_in, time_out, needs_revisit, stores:store_id (name)')
@@ -54,17 +55,18 @@ export async function GET(
   if (detErr) return NextResponse.json({ error: detErr.message }, { status: 400 })
 
   const detailsById = new Map<number, { store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean | null }>()
-  for (const d of details ?? []) {
-    detailsById.set(d.assignment_id as number, {
-      store_id: (d as any).store_id ?? null,
-      store_name: ((d as any).stores?.name as string | null) ?? null,
-      time_in: (d as any).time_in ?? null,
-      time_out: (d as any).time_out ?? null,
-      needs_revisit: Boolean((d as any).needs_revisit),
+  for (const d of (details ?? []) as DetailRow[]) {
+    detailsById.set(d.assignment_id, {
+      store_id: d.store_id ?? null,
+      store_name: d.stores?.name ?? null,
+      time_in: d.time_in ?? null,
+      time_out: d.time_out ?? null,
+      needs_revisit: Boolean(d.needs_revisit),
     })
   }
 
   // 3) Fetch materials used for these assignments and group by assignment_id
+  type MaterialRow = { assignment_id: number; material_id: number; materials?: { name?: string | null } | null }
   const { data: mats, error: matsErr } = await supabase
     .from('assignment_materials')
     .select('assignment_id, material_id, materials:material_id (name)')
@@ -73,9 +75,9 @@ export async function GET(
   if (matsErr) return NextResponse.json({ error: matsErr.message }, { status: 400 })
 
   const matNamesById = new Map<number, string[]>()
-  for (const m of mats ?? []) {
-    const aid = (m as any).assignment_id as number
-    const name = ((m as any).materials?.name as string | null) ?? null
+  for (const m of (mats ?? []) as MaterialRow[]) {
+    const aid = m.assignment_id
+    const name = m.materials?.name ?? null
     if (name) {
       const arr = matNamesById.get(aid) ?? []
       arr.push(name)
