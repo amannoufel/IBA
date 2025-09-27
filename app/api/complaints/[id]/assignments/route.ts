@@ -20,53 +20,73 @@ export async function GET(
   const complaintId = Number(id)
   if (Number.isNaN(complaintId)) return NextResponse.json({ error: 'Invalid complaint id' }, { status: 400 })
 
-  const { data, error } = await supabase
+  // 1) Fetch assignments (no deep embeds to avoid PostgREST relationship edge cases)
+  const { data: base, error: baseErr } = await supabase
     .from('complaint_assignments')
     .select(`
       id, worker_id, status, created_at, updated_at, is_leader,
-      profiles:worker_id (email, name),
-      assignment_details:assignment_details (
-        store_id, time_in, time_out, needs_revisit,
-        stores:store_id (name),
-        assignment_materials:assignment_materials (
-          material_id,
-          materials:material_id (name)
-        )
-      )
+      profiles:worker_id (email, name)
     `)
     .eq('complaint_id', complaintId)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (baseErr) return NextResponse.json({ error: baseErr.message }, { status: 400 })
 
-  // Types for safe normalization
-  type Profile = { email?: string | null; name?: string | null } | null
-  type DetailRow = {
-    store_id: number | null
-    time_in: string | null
-    time_out: string | null
-    needs_revisit: boolean | null
-    stores?: { name?: string | null } | null
-  }
-  type MaterialRow = { material_id: number; materials?: { name?: string | null } | null }
-  type Row = {
+  const rows = (base ?? []) as Array<{
     id: number
     worker_id: string
     status: string
     created_at: string
     updated_at: string
     is_leader?: boolean | null
-    profiles?: Profile
-    assignment_details?: (DetailRow & { assignment_materials?: MaterialRow[] | null })[] | null
+    profiles?: { email?: string | null; name?: string | null } | null
+  }>
+
+  if (rows.length === 0) return NextResponse.json([])
+
+  const assignmentIds = rows.map(r => r.id)
+
+  // 2) Fetch details for these assignments (with store name)
+  const { data: details, error: detErr } = await supabase
+    .from('assignment_details')
+    .select('assignment_id, store_id, time_in, time_out, needs_revisit, stores:store_id (name)')
+    .in('assignment_id', assignmentIds)
+
+  if (detErr) return NextResponse.json({ error: detErr.message }, { status: 400 })
+
+  const detailsById = new Map<number, { store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean | null }>()
+  for (const d of details ?? []) {
+    detailsById.set(d.assignment_id as number, {
+      store_id: (d as any).store_id ?? null,
+      store_name: ((d as any).stores?.name as string | null) ?? null,
+      time_in: (d as any).time_in ?? null,
+      time_out: (d as any).time_out ?? null,
+      needs_revisit: Boolean((d as any).needs_revisit),
+    })
   }
 
-  // Normalize embedded arrays/objects for the UI
-  const normalized = (data as Row[] | null | undefined ?? []).map((row) => {
-    const detailArr = row.assignment_details ?? []
-    const detail = Array.isArray(detailArr) && detailArr.length > 0 ? detailArr[0] : null
-    const matsArr = detail?.assignment_materials ?? []
-    const materials = (matsArr as MaterialRow[])
-      .map((m) => m.materials?.name ?? null)
-      .filter((n): n is string => typeof n === 'string')
+  // 3) Fetch materials used for these assignments and group by assignment_id
+  const { data: mats, error: matsErr } = await supabase
+    .from('assignment_materials')
+    .select('assignment_id, material_id, materials:material_id (name)')
+    .in('assignment_id', assignmentIds)
+
+  if (matsErr) return NextResponse.json({ error: matsErr.message }, { status: 400 })
+
+  const matNamesById = new Map<number, string[]>()
+  for (const m of mats ?? []) {
+    const aid = (m as any).assignment_id as number
+    const name = ((m as any).materials?.name as string | null) ?? null
+    if (name) {
+      const arr = matNamesById.get(aid) ?? []
+      arr.push(name)
+      matNamesById.set(aid, arr)
+    }
+  }
+
+  // 4) Merge and return
+  const result = rows.map((row) => {
+    const d = detailsById.get(row.id)
+    const materials = matNamesById.get(row.id) ?? []
     return {
       id: row.id,
       worker_id: row.worker_id,
@@ -75,18 +95,16 @@ export async function GET(
       updated_at: row.updated_at,
       profiles: row.profiles ?? null,
       is_leader: !!row.is_leader,
-      detail: detail
-        ? {
-            store_id: detail.store_id,
-            store_name: detail.stores?.name ?? null,
-            time_in: detail.time_in,
-            time_out: detail.time_out,
-            needs_revisit: Boolean(detail.needs_revisit),
-            materials,
-          }
-        : { store_id: null, store_name: null, time_in: null, time_out: null, needs_revisit: false, materials },
+      detail: {
+        store_id: d?.store_id ?? null,
+        store_name: d?.store_name ?? null,
+        time_in: d?.time_in ?? null,
+        time_out: d?.time_out ?? null,
+        needs_revisit: Boolean(d?.needs_revisit ?? false),
+        materials,
+      },
     }
   })
 
-  return NextResponse.json(normalized)
+  return NextResponse.json(result)
 }
