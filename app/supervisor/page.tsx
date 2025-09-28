@@ -107,9 +107,15 @@ export default function SupervisorDashboard() {
     // Load current assignments for this complaint
     fetch(`/api/complaints/${complaint.id}/assignments`).then(async (r) => {
       if (!r.ok) return
-      const data = await r.json() as { assignments: any[]; can_add_assignments?: boolean } | any[]
-      const arr: any[] = Array.isArray(data) ? data : (data?.assignments ?? [])
-      setCanAddAssignments(Array.isArray(data) ? true : Boolean(data?.can_add_assignments ?? true))
+      type ApiAssignment = {
+        id: number; worker_id: string; status: string; is_leader?: boolean;
+        profiles?: { email?: string | null; name?: string | null } | null;
+        detail?: { store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }
+      }
+      type ApiResponse = { assignments: ApiAssignment[]; can_add_assignments?: boolean }
+      const data = await r.json() as ApiResponse | ApiAssignment[]
+      const arr: ApiAssignment[] = Array.isArray(data) ? data : (data.assignments ?? [])
+      setCanAddAssignments(Array.isArray(data) ? true : Boolean(data.can_add_assignments ?? true))
       type RawAssignment = {
         id: number; worker_id: string; status: string; is_leader?: boolean;
         profiles?: { email?: string | null; name?: string | null } | null;

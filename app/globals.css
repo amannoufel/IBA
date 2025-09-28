@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
   --foreground-rgb: 17, 24, 39; /* slate-900 */
@@ -13,38 +11,6 @@ body {
   background: linear-gradient(180deg, rgb(var(--background-start-rgb)) 0%, rgb(var(--background-end-rgb)) 100%);
   min-height: 100vh;
 }
-
-/* Tasteful, modern defaults */
-@layer base {
-  html { @apply antialiased; }
-  h1 { @apply text-2xl font-semibold text-slate-900; }
-  h2 { @apply text-lg font-medium text-slate-900; }
-  h3 { @apply text-base font-semibold text-slate-900; }
-  p  { @apply text-slate-700; }
-
-  /* Form controls */
-  input[type="text"], input[type="datetime-local"], select, textarea { @apply bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500; }
-  input[type="checkbox"], input[type="radio"] { @apply accent-indigo-600; }
-}
-
-@layer components {
-  .card { @apply rounded-xl border border-slate-200 bg-white/80 backdrop-blur shadow-sm; }
-
-  .btn { @apply inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 disabled:pointer-events-none; }
-  .btn-primary { @apply btn bg-indigo-600 text-white hover:bg-indigo-700; }
-  .btn-secondary { @apply btn bg-slate-900 text-white hover:bg-slate-800; }
-  .btn-outline { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
-  .btn-ghost { @apply btn bg-transparent text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50; }
-
-  .badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border; }
-  .badge-green { @apply badge bg-green-50 text-green-700 border-green-200; }
-  .badge-blue { @apply badge bg-blue-50 text-blue-700 border-blue-200; }
-  .badge-yellow { @apply badge bg-yellow-50 text-yellow-800 border-yellow-200; }
-  .badge-gray { @apply badge bg-slate-100 text-slate-700 border-slate-200; }
-
-  .section-title { @apply text-sm font-medium text-slate-500; }
-}
-
 /* Subtle custom scrollbar */
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb { background-color: rgba(100,116,139,.35); border-radius: 9999px; border: 2px solid transparent; background-clip: padding-box; }
