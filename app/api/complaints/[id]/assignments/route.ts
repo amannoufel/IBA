@@ -166,7 +166,6 @@ export async function PATCH(
   // Compute remaining after removals
   const remaining = currentRows.filter(r => !removeIds.includes(r.id))
   const remainingWorkerIds = new Set(remaining.map(r => r.worker_id))
-  const hadLeader = currentRows.some(r => r.is_leader)
   const remainingHasLeader = remaining.some(r => r.is_leader)
 
   // Validation: if there are assignments remaining, ensure a leader remains or is set among remaining

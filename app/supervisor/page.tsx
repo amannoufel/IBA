@@ -559,7 +559,7 @@ export default function SupervisorDashboard() {
                             // Refresh list
                             await handleViewComplaint(selectedComplaint)
                           } catch (e: unknown) {
-                            const msg = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Failed to save changes'
+                            const msg = e instanceof Error ? e.message : 'Failed to save changes'
                             alert(msg)
                           }
                         }}
