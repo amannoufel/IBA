@@ -518,61 +518,67 @@ export default function SupervisorDashboard() {
                               Remove
                             </label>
                           </div>
-                          {a.detail ? (
-                            <div className="mt-1 text-xs text-gray-600 space-y-0.5">
-                              <div>
-                                <span className="font-medium">Assigned workers:</span> {assignments.map(w => `${w.name || w.email || w.worker_id}${w.is_leader ? ' (Leader)' : ''}`).join(', ')}
-                              </div>
-                              <div>
-                                <span className="font-medium">Store:</span> {a.detail.store_name || '—'}
-                              </div>
-                              <div>
-                                <span className="font-medium">Materials:</span> {a.detail.materials?.length ? a.detail.materials.join(', ') : '—'}
-                              </div>
-                              <div>
-                                <span className="font-medium">Time:</span> {a.detail.time_in ? new Date(a.detail.time_in).toLocaleString() : '—'} → {a.detail.time_out ? new Date(a.detail.time_out).toLocaleString() : '—'}
-                              </div>
-                              <div>
-                                <span className="font-medium">Revisit:</span> {a.detail.needs_revisit ? 'Yes' : 'No'}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="mt-1 text-xs text-gray-500">No details saved yet.</div>
+                          {a.is_leader && (
+                            <>
+                              {a.detail ? (
+                                <div className="mt-1 text-xs text-gray-600 space-y-0.5">
+                                  <div>
+                                    <span className="font-medium">Assigned workers:</span> {assignments.map(w => `${w.name || w.email || w.worker_id}${w.is_leader ? ' (Leader)' : ''}`).join(', ')}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Store:</span> {a.detail.store_name || '—'}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Materials:</span> {a.detail.materials?.length ? a.detail.materials.join(', ') : '—'}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Time:</span> {a.detail.time_in ? new Date(a.detail.time_in).toLocaleString() : '—'} → {a.detail.time_out ? new Date(a.detail.time_out).toLocaleString() : '—'}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Revisit:</span> {a.detail.needs_revisit ? 'Yes' : 'No'}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-1 text-xs text-gray-500">No details saved yet.</div>
+                              )}
+                              {a.history && a.history.length > 0 && (
+                                <div className="mt-2 border-t pt-2">
+                                  <p className="text-[11px] font-semibold text-gray-700 mb-1">Job History</p>
+                                  <ul className="space-y-1">
+                                    {a.history.map(h => (
+                                      <li key={h.visit_id} className="text-[11px] text-gray-700 border rounded p-1.5">
+                                        <div><span className="font-medium">Store:</span> {h.store_name || '—'}</div>
+                                        <div><span className="font-medium">Materials:</span> {h.materials?.length ? h.materials.join(', ') : '—'}</div>
+                                        <div><span className="font-medium">Time:</span> {h.time_in ? new Date(h.time_in).toLocaleString() : '—'} → {h.time_out ? new Date(h.time_out).toLocaleString() : '—'}</div>
+                                        <div><span className="font-medium">Revisit:</span> {h.needs_revisit ? 'Yes' : 'No'}</div>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </>
                           )}
-                          {a.history && a.history.length > 0 && (
-                            <div className="mt-2 border-t pt-2">
-                              <p className="text-[11px] font-semibold text-gray-700 mb-1">Job History</p>
-                              <ul className="space-y-1">
-                                {a.history.map(h => (
-                                  <li key={h.visit_id} className="text-[11px] text-gray-700 border rounded p-1.5">
-                                    <div><span className="font-medium">Store:</span> {h.store_name || '—'}</div>
-                                    <div><span className="font-medium">Materials:</span> {h.materials?.length ? h.materials.join(', ') : '—'}</div>
-                                    <div><span className="font-medium">Time:</span> {h.time_in ? new Date(h.time_in).toLocaleString() : '—'} → {h.time_out ? new Date(h.time_out).toLocaleString() : '—'}</div>
-                                    <div><span className="font-medium">Revisit:</span> {h.needs_revisit ? 'Yes' : 'No'}</div>
-                                  </li>
-                                ))}
-                              </ul>
+                          {a.is_leader && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <button
+                                className={`px-2 py-1 text-xs rounded ${a.status === 'pending_review' ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                                disabled={a.status !== 'pending_review'}
+                                onClick={() => updateAssignmentAction(a.id, 'approve')}
+                              >
+                                Confirm completion
+                              </button>
+                              <button
+                                className={`px-2 py-1 text-xs rounded ${a.status === 'pending_review' ? 'bg-yellow-600 text-white hover:bg-yellow-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                                disabled={a.status !== 'pending_review'}
+                                onClick={() => {
+                                  const note = prompt('Reason to reopen?') || ''
+                                  updateAssignmentAction(a.id, 'reopen', note)
+                                }}
+                              >
+                                Reopen
+                              </button>
                             </div>
                           )}
-                          <div className="mt-2 flex items-center gap-2">
-                            <button
-                              className={`px-2 py-1 text-xs rounded ${a.status === 'pending_review' ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
-                              disabled={a.status !== 'pending_review'}
-                              onClick={() => updateAssignmentAction(a.id, 'approve')}
-                            >
-                              Confirm completion
-                            </button>
-                            <button
-                              className={`px-2 py-1 text-xs rounded ${a.status === 'pending_review' ? 'bg-yellow-600 text-white hover:bg-yellow-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
-                              disabled={a.status !== 'pending_review'}
-                              onClick={() => {
-                                const note = prompt('Reason to reopen?') || ''
-                                updateAssignmentAction(a.id, 'reopen', note)
-                              }}
-                            >
-                              Reopen
-                            </button>
-                          </div>
                         </li>
                       ))}
                     </ul>
