@@ -347,7 +347,7 @@ export default function WorkerDashboard() {
                         disabled={selected.status === 'pending_review' || selected.status === 'completed'}
                         className={`px-2 py-1 text-xs rounded border ${selected.status === 'pending_review' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'} ${selected.status === 'pending_review' || selected.status === 'completed' ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        completed
+                        Submit for review
                       </button>
                     </div>
                   </div>
