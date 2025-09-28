@@ -80,7 +80,17 @@ export default function WorkerDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action })
       })
-      if (!res.ok) throw new Error('Failed to update status')
+      if (!res.ok) {
+        // Try to surface server error for easier diagnosis
+        let serverMsg = ''
+        try {
+          const err = await res.json()
+          serverMsg = err?.error || JSON.stringify(err)
+        } catch {
+          try { serverMsg = await res.text() } catch {}
+        }
+        throw new Error(`Failed to update status${serverMsg ? `: ${serverMsg}` : ''}`)
+      }
       const dj = await res.json().catch(() => ({} as { status?: string }))
       await fetchAssignments()
       // Update local detail view if same assignment
@@ -90,6 +100,7 @@ export default function WorkerDashboard() {
       }
     } catch (e) {
       console.error(e)
+      alert((e as Error).message || 'Failed to update status')
     }
   }
 
@@ -324,8 +335,20 @@ export default function WorkerDashboard() {
                   <div className="flex items-center gap-2">
                     <button onClick={saveDetail} disabled={saving || !selected.is_leader} className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${saving || !selected.is_leader ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}>{saving ? 'Saving…' : 'Save'}</button>
                     <div className="ml-auto flex items-center gap-2">
-                      <button onClick={() => selected && updateAssignmentAction(selected.id, 'start')} className={`px-2 py-1 text-xs rounded border ${selected.status === 'in_progress' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>in progress</button>
-                      <button onClick={() => selected && updateAssignmentAction(selected.id, 'mark_done')} className={`px-2 py-1 text-xs rounded border ${selected.status === 'pending_review' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>completed</button>
+                      <button
+                        onClick={() => selected && updateAssignmentAction(selected.id, 'start')}
+                        disabled={selected.status === 'in_progress' || selected.status === 'pending_review' || selected.status === 'completed'}
+                        className={`px-2 py-1 text-xs rounded border ${selected.status === 'in_progress' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'} ${selected.status === 'in_progress' || selected.status === 'pending_review' || selected.status === 'completed' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        in progress
+                      </button>
+                      <button
+                        onClick={() => selected && updateAssignmentAction(selected.id, 'mark_done')}
+                        disabled={selected.status === 'pending_review' || selected.status === 'completed'}
+                        className={`px-2 py-1 text-xs rounded border ${selected.status === 'pending_review' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'} ${selected.status === 'pending_review' || selected.status === 'completed' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        completed
+                      </button>
                     </div>
                   </div>
                   {selected?.status === 'pending_review' && (
