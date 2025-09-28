@@ -46,6 +46,7 @@ export default function SupervisorDashboard() {
     };
     history?: Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>;
   }>>([])
+  const [canAddAssignments, setCanAddAssignments] = useState<boolean>(true)
   const [leaderSelection, setLeaderSelection] = useState<string | null>(null)
   const router = useRouter()
   const supabase = useSupabase()
@@ -106,13 +107,15 @@ export default function SupervisorDashboard() {
     // Load current assignments for this complaint
     fetch(`/api/complaints/${complaint.id}/assignments`).then(async (r) => {
       if (!r.ok) return
-      const data = await r.json()
+      const data = await r.json() as { assignments: any[]; can_add_assignments?: boolean } | any[]
+      const arr: any[] = Array.isArray(data) ? data : (data?.assignments ?? [])
+      setCanAddAssignments(Array.isArray(data) ? true : Boolean(data?.can_add_assignments ?? true))
       type RawAssignment = {
         id: number; worker_id: string; status: string; is_leader?: boolean;
         profiles?: { email?: string | null; name?: string | null } | null;
         detail?: { store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }
       }
-      const base: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null; is_leader?: boolean; detail?: RawAssignment['detail'] }>= ((data || []) as RawAssignment[]).map((a) => ({
+      const base: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null; is_leader?: boolean; detail?: RawAssignment['detail'] }>= (arr as RawAssignment[]).map((a) => ({
         id: a.id,
         worker_id: a.worker_id,
         status: a.status,
@@ -399,7 +402,8 @@ export default function SupervisorDashboard() {
               <div className="mt-6">
                 {/* Assign to workers */}
                 <p className="text-sm font-medium text-gray-500 mb-2">Assign to Workers</p>
-                <div className="mb-2 flex flex-col gap-2">
+                {canAddAssignments ? (
+                  <div className="mb-2 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <div className="border rounded p-2 min-w-[260px] max-w-[480px] max-h-40 overflow-auto">
                       {workers.length === 0 ? (
@@ -478,7 +482,19 @@ export default function SupervisorDashboard() {
                       <p className="text-xs text-gray-500">Selected: {selectedWorkers.length} {leaderSelection && <span className="ml-2 inline-block px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded">Leader chosen</span>}</p>
                     </div>
                   </div>
-                </div>
+                  </div>
+                ) : (
+                  <div className="mb-2 p-2 rounded border border-yellow-200 bg-yellow-50 text-yellow-800 text-xs flex items-center justify-between">
+                    <span>Assignments are temporarily locked until the leader saves the first job update.</span>
+                    <button
+                      type="button"
+                      onClick={() => setCanAddAssignments(true)}
+                      className="ml-2 px-2 py-1 rounded bg-yellow-600 text-white hover:bg-yellow-700"
+                    >
+                      Unlock to reassign
+                    </button>
+                  </div>
+                )}
                 {assignments.length > 0 && (
                   <div className="mt-2">
                     <div className="flex items-center justify-between mb-1">

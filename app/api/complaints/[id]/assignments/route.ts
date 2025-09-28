@@ -126,7 +126,10 @@ export async function GET(
     }
   })
 
-  return NextResponse.json(result)
+  // can_add_assignments is true if there are no assignments yet, or if any visit exists
+  const can_add_assignments = result.length === 0 || latestRows.length > 0
+
+  return NextResponse.json({ assignments: result, can_add_assignments })
 }
 
 export async function PATCH(
