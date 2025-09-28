@@ -44,7 +44,7 @@ export async function PATCH(
   if (action === 'approve') nextStatus = 'completed'
   if (action === 'reopen') nextStatus = 'in_progress'
 
-  let { error: uErr } = await supabase
+  const { error: uErr } = await supabase
     .from('complaint_assignments')
     .update({ status: nextStatus })
     .eq('id', assignmentId)
