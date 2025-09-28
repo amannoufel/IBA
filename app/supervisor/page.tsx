@@ -224,31 +224,26 @@ export default function SupervisorDashboard() {
   if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm">
+    <div className="min-h-screen">
+      <nav className="sticky top-0 z-30 backdrop-blur bg-white/70 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-xl font-semibold">Supervisor Dashboard</h1>
-            <button
-              onClick={handleSignOut}
-              className="px-4 py-2 text-sm text-red-600 hover:text-red-700"
-            >
-              Sign Out
-            </button>
+            <button onClick={handleSignOut} className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50">Sign Out</button>
           </div>
         </div>
       </nav>
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white shadow rounded-lg p-4 overflow-auto">
+          <div className="rounded-xl border border-slate-200 bg-white/80 shadow-sm p-4 overflow-auto">
             <h2 className="text-lg font-medium mb-4">All Tenant Complaints</h2>
             
             {complaints.length === 0 ? (
               <p className="text-gray-500">No complaints found.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
                     <tr>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         ID
@@ -298,25 +293,20 @@ export default function SupervisorDashboard() {
                           {complaint.category}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border ${
                             complaint.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
+                              ? 'bg-yellow-50 text-yellow-800 border-yellow-200'
                               : complaint.status === 'in_progress' || complaint.status === 'attended'
-                              ? 'bg-blue-100 text-blue-800'
+                              ? 'bg-blue-50 text-blue-800 border-blue-200'
                               : complaint.status === 'completed' || complaint.status === 'resolved'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
+                              ? 'bg-green-50 text-green-800 border-green-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
                           }`}>
                             {complaint.status.replace('_', ' ')}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <button
-                            onClick={() => handleViewComplaint(complaint)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                          >
-                            View
-                          </button>
+                          <button onClick={() => handleViewComplaint(complaint)} className="text-indigo-600 hover:text-indigo-900">View</button>
                         </td>
                       </tr>
                     ))}

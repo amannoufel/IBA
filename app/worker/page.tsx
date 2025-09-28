@@ -177,62 +177,52 @@ export default function WorkerDashboard() {
     router.replace('/')
   }
 
-  if (!user) return <div>Loading...</div>
+  if (!user) return <div className="min-h-screen flex items-center justify-center text-slate-600">Loading...</div>
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm">
+    <div className="min-h-screen">
+      <nav className="sticky top-0 z-30 backdrop-blur bg-white/70 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-xl font-semibold">Worker Dashboard</h1>
-            <button
-              onClick={handleSignOut}
-              className="px-4 py-2 text-sm text-red-600 hover:text-red-700"
-            >
-              Sign Out
-            </button>
+            <button onClick={handleSignOut} className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50">Sign Out</button>
           </div>
         </div>
       </nav>
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-white shadow rounded-lg p-4 lg:col-span-2">
+        <div className="px-4 sm:px-0">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div className="rounded-xl border border-slate-200 bg-white/80 shadow-sm p-4 lg:col-span-2">
               <h2 className="text-lg font-medium mb-3">My Assignments</h2>
               {assignments.length === 0 ? (
-                <p className="text-gray-500">No assignments yet.</p>
+                <p className="text-slate-500">No assignments yet.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
                       <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leader</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">ID</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Created</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Description</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Leader</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white divide-y divide-slate-100">
                       {assignments.map((a) => (
-                        <tr key={a.id} className="hover:bg-gray-50">
+                        <tr key={a.id} className="hover:bg-slate-50">
                           <td className="px-4 py-2 text-sm">{a.complaint.id}</td>
                           <td className="px-4 py-2 text-sm">{new Date(a.complaint.created_at).toLocaleString()}</td>
                           <td className="px-4 py-2 text-sm">{a.complaint.description}</td>
                           <td className="px-4 py-2 text-sm">
-                            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">{a.status.replace('_',' ')}</span>
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${a.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : a.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' : a.status === 'pending_review' ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>{a.status.replace('_',' ')}</span>
                           </td>
                           <td className="px-4 py-2 text-sm">
-                            {a.is_leader ? <span className="text-green-600 font-semibold text-xs">Yes</span> : <span className="text-gray-400 text-xs">No</span>}
+                            {a.is_leader ? <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border bg-green-50 text-green-700 border-green-200">Leader</span> : <span className="text-slate-400 text-xs">—</span>}
                           </td>
                           <td className="px-4 py-2 text-sm">
-                            <button
-                              onClick={() => openDetail(a)}
-                              className="text-indigo-600 hover:text-indigo-800"
-                            >
-                              View / Update
-                            </button>
+                            <button onClick={() => openDetail(a)} className="inline-flex items-center text-indigo-600 hover:text-indigo-800">View / Update</button>
                           </td>
                         </tr>
                       ))}
@@ -241,15 +231,15 @@ export default function WorkerDashboard() {
                 </div>
               )}
             </div>
-            <div className="bg-white shadow rounded-lg p-4">
+            <div className="rounded-xl border border-slate-200 bg-white/80 shadow-sm p-4">
               <h2 className="text-lg font-medium mb-3">Job Details</h2>
               {!selected ? (
-                <p className="text-gray-500 text-sm">Select a job from the table to view and update details.</p>
+                <p className="text-slate-500 text-sm">Select a job from the table to view and update details.</p>
               ) : (
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-500">Complaint #{selected.complaint.id}</p>
-                    <p className="font-medium">{selected.complaint.description}</p>
+                    <p className="text-sm text-slate-500">Complaint #{selected.complaint.id}</p>
+                    <p className="font-medium text-slate-900">{selected.complaint.description}</p>
                   </div>
                   {!selected.is_leader && (
                     <div className="p-2 text-xs bg-yellow-50 border border-yellow-200 text-yellow-700 rounded">
@@ -262,12 +252,12 @@ export default function WorkerDashboard() {
                         <span className="font-medium">Assigned workers:</span> {teammates.map(t => `${t.name || t.email || t.worker_id}${t.is_leader ? ' (Leader)' : ''}`).join(', ')}
                       </div>
                     )}
-                    <label className="block text-sm font-medium text-gray-700">Store</label>
+                    <label className="block text-sm font-medium text-slate-700">Store</label>
                     <select
                       value={detail?.store_id ?? ''}
                       disabled={!selected.is_leader}
                       onChange={(e) => setDetail((d) => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), store_id: e.target.value ? Number(e.target.value) : null }))}
-                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md disabled:opacity-60"
+                      className="mt-1 block w-full disabled:opacity-60"
                     >
                       <option value="">Select store</option>
                       {stores.map((s) => (
@@ -276,8 +266,8 @@ export default function WorkerDashboard() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Materials used</label>
-                    <div className="border rounded p-2 max-h-32 overflow-auto">
+                    <label className="block text-sm font-medium text-slate-700">Materials used</label>
+                    <div className="border border-slate-200 rounded p-2 max-h-32 overflow-auto bg-white">
                       {materials.map((m) => {
                         const checked = detail?.materials?.includes(m.id) ?? false
                         return (
@@ -301,23 +291,23 @@ export default function WorkerDashboard() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Time In</label>
+                      <label className="block text-sm font-medium text-slate-700">Time In</label>
                       <input
                         type="datetime-local"
                         disabled={!selected.is_leader}
                         value={detail?.time_in ? new Date(detail.time_in).toISOString().slice(0,16) : ''}
                         onChange={(e) => setDetail((d) => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), time_in: e.target.value ? new Date(e.target.value).toISOString() : null }))}
-                        className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md disabled:opacity-60"
+                        className="mt-1 block w-full disabled:opacity-60"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Time Out</label>
+                      <label className="block text-sm font-medium text-slate-700">Time Out</label>
                       <input
                         type="datetime-local"
                         disabled={!selected.is_leader}
                         value={detail?.time_out ? new Date(detail.time_out).toISOString().slice(0,16) : ''}
                         onChange={(e) => setDetail((d) => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), time_out: e.target.value ? new Date(e.target.value).toISOString() : null }))}
-                        className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md disabled:opacity-60"
+                        className="mt-1 block w-full disabled:opacity-60"
                       />
                     </div>
                   </div>
@@ -329,40 +319,24 @@ export default function WorkerDashboard() {
                       checked={detail?.needs_revisit ?? false}
                       onChange={(e) => setDetail((d) => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), needs_revisit: e.target.checked }))}
                     />
-                    <label htmlFor="needs-revisit" className="text-sm">Attended once but need to revisit</label>
+                    <label htmlFor="needs-revisit" className="text-sm text-slate-700">Attended once but need to revisit</label>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={saveDetail}
-                      disabled={saving || !selected.is_leader}
-                      className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${saving || !selected.is_leader ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
-                    >
-                      {saving ? 'Saving…' : 'Save'}
-                    </button>
+                    <button onClick={saveDetail} disabled={saving || !selected.is_leader} className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${saving || !selected.is_leader ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}>{saving ? 'Saving…' : 'Save'}</button>
                     <div className="ml-auto flex items-center gap-2">
-                      <button
-                        onClick={() => selected && updateAssignmentAction(selected.id, 'start')}
-                        className={`px-2 py-1 text-xs rounded border ${selected.status === 'in_progress' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                      >
-                        in progress
-                      </button>
-                      <button
-                        onClick={() => selected && updateAssignmentAction(selected.id, 'mark_done')}
-                        className={`px-2 py-1 text-xs rounded border ${selected.status === 'pending_review' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                      >
-                        completed
-                      </button>
+                      <button onClick={() => selected && updateAssignmentAction(selected.id, 'start')} className={`px-2 py-1 text-xs rounded border ${selected.status === 'in_progress' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>in progress</button>
+                      <button onClick={() => selected && updateAssignmentAction(selected.id, 'mark_done')} className={`px-2 py-1 text-xs rounded border ${selected.status === 'pending_review' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>completed</button>
                     </div>
                   </div>
                   {selected?.status === 'pending_review' && (
-                    <div className="text-xs text-gray-500">Awaiting supervisor confirmation…</div>
+                    <div className="text-xs text-slate-500">Awaiting supervisor confirmation…</div>
                   )}
                   {history.length > 0 && (
-                    <div className="mt-4 border-t pt-3">
+                    <div className="mt-4 border-t border-slate-200 pt-3">
                       <h3 className="text-sm font-medium mb-2">Job History</h3>
-                      <ul className="space-y-2 text-xs text-gray-700">
+                      <ul className="space-y-2 text-xs text-slate-700">
                         {history.map(h => (
-                          <li key={h.visit_id} className="border rounded p-2">
+                          <li key={h.visit_id} className="border border-slate-200 rounded p-2 bg-white">
                             <div><span className="font-semibold">Store:</span> {h.store_name || '—'}</div>
                             <div><span className="font-semibold">Materials:</span> {h.materials?.length ? h.materials.join(', ') : '—'}</div>
                             <div><span className="font-semibold">Time:</span> {h.time_in ? new Date(h.time_in).toLocaleString() : '—'} → {h.time_out ? new Date(h.time_out).toLocaleString() : '—'}</div>
