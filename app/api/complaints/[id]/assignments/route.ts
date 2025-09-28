@@ -76,7 +76,9 @@ export async function GET(
   }
 
   // 3) Fetch materials used for the latest visit of these assignments and group by assignment_id
-  const visitIds = (details ?? []).map((d: any) => d.visit_id).filter((v: any) => v)
+  const visitIds: number[] = (details ?? [])
+    .map((d) => (d as LatestRow).visit_id)
+    .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v))
   type MaterialRow = { visit_id: number; material_id: number; materials?: { name?: string | null } | null }
   const { data: mats, error: matsErr } = visitIds.length > 0
     ? await supabase

@@ -558,8 +558,9 @@ export default function SupervisorDashboard() {
                             }
                             // Refresh list
                             await handleViewComplaint(selectedComplaint)
-                          } catch (e: any) {
-                            alert(e?.message || 'Failed to save changes')
+                          } catch (e: unknown) {
+                            const msg = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Failed to save changes'
+                            alert(msg)
                           }
                         }}
                         className="px-3 py-1 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700"
