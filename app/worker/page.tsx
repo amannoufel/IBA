@@ -14,6 +14,8 @@ export default function WorkerDashboard() {
   const [materials, setMaterials] = useState<Array<{ id: number; name: string }>>([])
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState<{ store_id: number | null; materials: number[]; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null>(null)
+  const [history, setHistory] = useState<Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>>([])
+  const [teammates, setTeammates] = useState<Array<{ worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }>>([])
   const router = useRouter()
   const supabase = useSupabase()
 
@@ -102,11 +104,11 @@ export default function WorkerDashboard() {
       if (mRes.ok) setMaterials(await mRes.json())
     } catch (e) { console.warn(e) }
 
-    // load existing detail
+    // load existing detail + history + teammates
     try {
       const dRes = await fetch(`/api/assignments/${a.id}/detail`)
       if (dRes.ok) {
-        const d = await dRes.json() as { detail: { store_id: number | null; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null; materials_used: number[] }
+        const d = await dRes.json() as { detail: { store_id: number | null; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null; materials_used: number[]; history?: Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>; teammates?: Array<{ worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }> }
         setDetail({
           store_id: d.detail?.store_id ?? null,
           materials: d.materials_used ?? [],
@@ -114,11 +116,17 @@ export default function WorkerDashboard() {
           time_out: d.detail?.time_out ?? null,
           needs_revisit: d.detail?.needs_revisit ?? false,
         })
+        setHistory(d.history ?? [])
+        setTeammates(d.teammates ?? [])
       } else {
         setDetail({ store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false })
+        setHistory([])
+        setTeammates([])
       }
     } catch {
       setDetail({ store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false })
+      setHistory([])
+      setTeammates([])
     }
   }
 
@@ -138,8 +146,22 @@ export default function WorkerDashboard() {
         })
       })
       if (!res.ok) throw new Error('Failed to save details')
-      // optional: refresh assignments list
+      // Refresh assignments list so the left table reflects changes (e.g., status badges elsewhere)
       await fetchAssignments()
+      // After save: if revisit is requested, keep the form open, refresh history, and reset inputs for the next visit.
+      // Otherwise, hide the details panel since the job's visit is completed.
+      if (detail.needs_revisit) {
+        try {
+          const dRes = await fetch(`/api/assignments/${selected.id}/detail`)
+          if (dRes.ok) {
+            const dj = await dRes.json() as { history?: Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }> }
+            setHistory(dj.history ?? [])
+          }
+        } catch {}
+        setDetail({ store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false })
+      } else {
+        setSelected(null)
+      }
       alert('Saved')
     } catch (e) {
       console.error(e)
@@ -234,6 +256,11 @@ export default function WorkerDashboard() {
                     </div>
                   )}
                   <div>
+                    {teammates.length > 0 && (
+                      <div className="mb-2 text-xs text-gray-600">
+                        <span className="font-medium">Assigned workers:</span> {teammates.map(t => `${t.name || t.email || t.worker_id}${t.is_leader ? ' (Leader)' : ''}`).join(', ')}
+                      </div>
+                    )}
                     <label className="block text-sm font-medium text-gray-700">Store</label>
                     <select
                       value={detail?.store_id ?? ''}
@@ -323,6 +350,21 @@ export default function WorkerDashboard() {
                       ))}
                     </div>
                   </div>
+                  {history.length > 0 && (
+                    <div className="mt-4 border-t pt-3">
+                      <h3 className="text-sm font-medium mb-2">Job History</h3>
+                      <ul className="space-y-2 text-xs text-gray-700">
+                        {history.map(h => (
+                          <li key={h.visit_id} className="border rounded p-2">
+                            <div><span className="font-semibold">Store:</span> {h.store_name || '—'}</div>
+                            <div><span className="font-semibold">Materials:</span> {h.materials?.length ? h.materials.join(', ') : '—'}</div>
+                            <div><span className="font-semibold">Time:</span> {h.time_in ? new Date(h.time_in).toLocaleString() : '—'} → {h.time_out ? new Date(h.time_out).toLocaleString() : '—'}</div>
+                            <div><span className="font-semibold">Revisit:</span> {h.needs_revisit ? 'Yes' : 'No'}</div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -1,25 +1,22 @@
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import type { Database } from './app/types/supabase'
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
+  const supabase = createMiddlewareClient<Database>({ req, res })
 
   try {
-    // Refresh session if it exists
-    const { data: { session }, error } = await supabase.auth.getSession()
-    if (error) {
-      console.error('Middleware session error:', error)
-    }
-
-    // Get current path
+    // Get current path and early-allow public routes without touching auth
     const path = req.nextUrl.pathname
-
-    // Allow these paths regardless of auth status
-    if (path === '/' || path === '/auth/callback') {
+    const publicPaths = ['/', '/auth/callback']
+    if (publicPaths.includes(path)) {
       return res
     }
+
+    // For protected routes, refresh session if available
+    const { data: { session } } = await supabase.auth.getSession()
 
     // No session, redirect to login
     if (!session) {
@@ -36,21 +33,16 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
 
-    // Get the requested path section
+    // Role-specific path guard
     const requestedPath = path.split('/')[1]
-
-    // If trying to access a role-specific path
     if (requestedPath && ['tenant', 'worker', 'supervisor'].includes(requestedPath)) {
-      // Redirect if trying to access wrong role's path
       if (requestedPath !== role) {
         return NextResponse.redirect(new URL(`/${role}`, req.url))
       }
     }
 
-    // Allow the request to proceed
     return res
-  } catch (error) {
-    console.error('Middleware error:', error)
+  } catch (_error) {
     const redirectUrl = new URL('/', req.url)
     redirectUrl.searchParams.set('error', 'An error occurred during authentication')
     return NextResponse.redirect(redirectUrl)

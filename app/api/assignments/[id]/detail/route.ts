@@ -7,8 +7,9 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  // Next.js 15: await cookies() once, then pass it synchronously to Supabase helper
+  const supabase = createRouteHandlerClient<Database>({ cookies: (() => cookieStore) as unknown as typeof cookies })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -25,23 +26,110 @@ export async function GET(
 
   if (aErr) return NextResponse.json({ error: aErr.message }, { status: 400 })
 
-  // Fetch details (may not exist yet)
-  const { data: detail } = await supabase
-    .from('assignment_details')
-    .select('assignment_id, store_id, time_in, time_out, needs_revisit')
+  // Fetch latest visit for this assignment (may not exist yet)
+  const { data: visit } = await supabase
+    .from('assignment_visits')
+    .select('id, assignment_id, store_id, time_in, time_out, outcome')
     .eq('assignment_id', assignmentId)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
-  // Fetch materials used
-  const { data: mats } = await supabase
-    .from('assignment_materials')
-    .select('material_id')
+  // Fetch materials used for latest visit
+  const visitId = visit?.id ?? null
+  const { data: mats } = visitId
+    ? await supabase
+        .from('assignment_visit_materials')
+        .select('material_id')
+        .eq('visit_id', visitId)
+    : { data: [] as { material_id: number }[] }
+
+  const matsList = (mats ?? []) as Array<{ material_id: number }>
+
+  // Build visit history: all visits for this assignment, with store names and materials
+  const { data: allVisits } = await supabase
+    .from('assignment_visits')
+    .select('id, assignment_id, store_id, time_in, time_out, outcome')
     .eq('assignment_id', assignmentId)
+    .order('created_at', { ascending: false })
+
+  const vrows = (allVisits ?? []) as Array<{ id: number; assignment_id: number; store_id: number | null; time_in: string | null; time_out: string | null; outcome: 'completed' | 'revisit' | null }>
+  const vIds = vrows.map(v => v.id)
+
+  // Fetch materials for all visits in one query, with names
+  const { data: allMats } = vIds.length
+    ? await supabase
+        .from('assignment_visit_materials')
+        .select('visit_id, material_id, materials:material_id (name)')
+        .in('visit_id', vIds)
+    : { data: [] as Array<{ visit_id: number; material_id: number; materials?: { name?: string | null } | null }> }
+
+  const matsByVisit = new Map<number, { ids: number[]; names: string[] }>()
+  for (const m of (allMats ?? []) as Array<{ visit_id: number; material_id: number; materials?: { name?: string | null } | null }>) {
+    const ids = matsByVisit.get(m.visit_id)?.ids ?? []
+    const names = matsByVisit.get(m.visit_id)?.names ?? []
+    ids.push(m.material_id)
+    const nm = m.materials?.name ?? null
+    if (nm) names.push(nm)
+    matsByVisit.set(m.visit_id, { ids, names })
+  }
+
+  // Resolve store names for history
+  const storeIds = Array.from(new Set(vrows.map(v => v.store_id).filter((s): s is number => typeof s === 'number')))
+  const { data: storeRows } = storeIds.length
+    ? await supabase.from('stores').select('id, name').in('id', storeIds)
+    : { data: [] as { id: number; name: string }[] }
+  const storeNameById = new Map<number, string>()
+  for (const s of (storeRows ?? []) as { id: number; name: string }[]) storeNameById.set(s.id, s.name)
+
+  const history = vrows.map(v => ({
+    visit_id: v.id,
+    assignment_id: v.assignment_id,
+    store_id: v.store_id,
+    store_name: v.store_id != null ? (storeNameById.get(v.store_id) ?? null) : null,
+    time_in: v.time_in,
+    time_out: v.time_out,
+    needs_revisit: v.outcome === 'revisit',
+    materials_ids: matsByVisit.get(v.id)?.ids ?? [],
+    materials: matsByVisit.get(v.id)?.names ?? [],
+  }))
+
+  // Team mates: list all assignments for the same complaint so workers can see who is assigned
+  // First, resolve the complaint_id for this assignment
+  const { data: complaintRow } = await supabase
+    .from('complaint_assignments')
+    .select('complaint_id')
+    .eq('id', assignmentId)
+    .single()
+  let teammates: Array<{ worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }> = []
+  if (complaintRow?.complaint_id) {
+    type TeamRow = { worker_id: string; is_leader: boolean | null; profiles?: { email?: string | null; name?: string | null } | null }
+    const { data: teamRows } = await supabase
+      .from('complaint_assignments')
+      .select('worker_id, is_leader, profiles:worker_id (email, name)')
+      .eq('complaint_id', complaintRow.complaint_id)
+    teammates = ((teamRows ?? []) as TeamRow[]).map((t) => ({
+      worker_id: t.worker_id,
+      email: t.profiles?.email ?? null,
+      name: t.profiles?.name ?? null,
+      is_leader: !!t.is_leader,
+    }))
+  }
 
   return NextResponse.json({
     assignment,
-    detail: detail ?? null,
-    materials_used: (mats ?? []).map((m) => m.material_id)
+    detail: visit
+      ? {
+          assignment_id: visit.assignment_id,
+          store_id: visit.store_id,
+          time_in: visit.time_in,
+          time_out: visit.time_out,
+          needs_revisit: visit.outcome === 'revisit',
+        }
+      : null,
+    materials_used: matsList.map((m) => m.material_id),
+    history,
+    teammates,
   })
 }
 
@@ -49,8 +137,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient<Database>({ cookies: (() => cookieStore) as unknown as typeof cookies })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -74,39 +162,59 @@ export async function PUT(
   if (body.time_out === null || typeof body.time_out === 'string') payload.time_out = body.time_out
   if (typeof body.needs_revisit === 'boolean') payload.needs_revisit = body.needs_revisit
 
-  // Upsert details row
-  const { data: existing } = await supabase
-    .from('assignment_details')
-    .select('assignment_id')
+  // Ensure an open visit exists (time_out is null); if not, create one
+  const { data: openVisit } = await supabase
+    .from('assignment_visits')
+    .select('id')
     .eq('assignment_id', assignmentId)
+    .is('time_out', null)
     .maybeSingle()
 
-  if (existing?.assignment_id) {
-    const { error: upErr } = await supabase
-      .from('assignment_details')
-      .update(payload)
-      .eq('assignment_id', assignmentId)
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 400 })
-  } else {
-    const { error: insErr } = await supabase
-      .from('assignment_details')
-      .insert([{ assignment_id: assignmentId, ...payload }])
-    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 400 })
+  let visitId: number | null = openVisit?.id ?? null
+  if (!visitId) {
+    const { data: created, error: insVisitErr } = await supabase
+      .from('assignment_visits')
+      .insert([{ assignment_id: assignmentId, time_in: body.time_in ?? new Date().toISOString(), created_by: (await supabase.auth.getUser()).data.user?.id as string }])
+      .select('id')
+      .single()
+    if (insVisitErr) return NextResponse.json({ error: insVisitErr.message }, { status: 400 })
+    visitId = created.id as number
+  }
+
+  // Update visit fields based on payload
+  const visitUpdate: Record<string, unknown> = {}
+  if (payload.store_id !== undefined) visitUpdate.store_id = payload.store_id
+  if (payload.time_in !== undefined) visitUpdate.time_in = payload.time_in
+  if (payload.time_out !== undefined) visitUpdate.time_out = payload.time_out
+  if (payload.needs_revisit !== undefined || payload.time_out !== undefined) {
+    const needsRevisit = typeof body.needs_revisit === 'boolean' ? body.needs_revisit : false
+    // If revisit is requested and no explicit time_out provided, close the current visit now
+    if (needsRevisit && (body.time_out === undefined || body.time_out === null)) {
+      visitUpdate.time_out = new Date().toISOString()
+    }
+    visitUpdate.outcome = needsRevisit ? 'revisit' : (body.time_out ? 'completed' : null)
+  }
+  if (Object.keys(visitUpdate).length > 0) {
+    const { error: upVisitErr } = await supabase
+      .from('assignment_visits')
+      .update(visitUpdate)
+      .eq('id', visitId)
+    if (upVisitErr) return NextResponse.json({ error: upVisitErr.message }, { status: 400 })
   }
 
   // Sync materials list if provided
   if (Array.isArray(body.materials)) {
     // Delete existing
     const { error: delErr } = await supabase
-      .from('assignment_materials')
+      .from('assignment_visit_materials')
       .delete()
-      .eq('assignment_id', assignmentId)
+      .eq('visit_id', visitId as number)
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 })
 
     if (body.materials.length > 0) {
-      const rows = body.materials.map((mid) => ({ assignment_id: assignmentId, material_id: mid }))
+      const rows = body.materials.map((mid) => ({ visit_id: visitId as number, material_id: mid }))
       const { error: insErr } = await supabase
-        .from('assignment_materials')
+        .from('assignment_visit_materials')
         .insert(rows)
       if (insErr) return NextResponse.json({ error: insErr.message }, { status: 400 })
     }

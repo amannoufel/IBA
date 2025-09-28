@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server'
 import type { Database } from '../../../types/supabase'
 
 export async function GET() {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore })
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient<Database>({ cookies: (() => cookieStore) as unknown as () => Promise<ReturnType<typeof cookies>> })
 
   try {
     // Verify user is authenticated

@@ -27,6 +27,8 @@ export default function SupervisorDashboard() {
   const [workers, setWorkers] = useState<Array<{ id: string; email: string; name?: string | null }>>([])
   const [assigning, setAssigning] = useState(false)
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
+  const [removeAssignmentIds, setRemoveAssignmentIds] = useState<number[]>([])
+  const [leaderEdit, setLeaderEdit] = useState<string | null>(null)
   const [assignments, setAssignments] = useState<Array<{
     id: number;
     worker_id: string;
@@ -42,6 +44,7 @@ export default function SupervisorDashboard() {
       needs_revisit: boolean;
       materials: string[];
     };
+    history?: Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>;
   }>>([])
   const [leaderSelection, setLeaderSelection] = useState<string | null>(null)
   const router = useRouter()
@@ -109,7 +112,7 @@ export default function SupervisorDashboard() {
         profiles?: { email?: string | null; name?: string | null } | null;
         detail?: { store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }
       }
-      const items: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null; is_leader?: boolean; detail?: RawAssignment['detail'] }>= ((data || []) as RawAssignment[]).map((a) => ({
+      const base: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null; is_leader?: boolean; detail?: RawAssignment['detail'] }>= ((data || []) as RawAssignment[]).map((a) => ({
         id: a.id,
         worker_id: a.worker_id,
         status: a.status,
@@ -118,10 +121,21 @@ export default function SupervisorDashboard() {
         name: a.profiles?.name ?? undefined,
         detail: a.detail,
       }))
-      setAssignments(items)
+      // Fetch each assignment's full history in parallel
+      const withHistory = await Promise.all(base.map(async (a) => {
+        try {
+          const res = await fetch(`/api/assignments/${a.id}/detail`)
+          if (!res.ok) return { ...a, history: [] }
+          const dj = await res.json() as { history?: Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }> }
+          return { ...a, history: dj.history ?? [] }
+        } catch { return { ...a, history: [] } }
+      }))
+      setAssignments(withHistory)
       // If there is an existing leader set it in local state
-      const existingLeader = items.find(i => i.is_leader)
+      const existingLeader = withHistory.find(i => i.is_leader)
       setLeaderSelection(existingLeader ? existingLeader.worker_id : null)
+      setLeaderEdit(existingLeader ? existingLeader.worker_id : null)
+      setRemoveAssignmentIds([])
     })
   }
 
@@ -152,6 +166,11 @@ export default function SupervisorDashboard() {
 
   const handleAssign = async () => {
     if (!selectedComplaint || selectedWorkers.length === 0) return
+    // Front-end guard: if no assignments yet (first-time assignment), require a leader selection among selected workers
+    if (assignments.length === 0 && (!leaderSelection || !selectedWorkers.includes(leaderSelection))) {
+      alert('Please select a leader from the chosen workers before assigning.')
+      return
+    }
     try {
       setAssigning(true)
       const res = await fetch(`/api/complaints/${selectedComplaint.id}/assign`, {
@@ -461,11 +480,33 @@ export default function SupervisorDashboard() {
                         <li key={a.id} className="text-sm border rounded p-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium">{a.name || a.email || a.worker_id}</span>
-                            {a.is_leader && <span className="px-1.5 py-0.5 text-[10px] rounded bg-indigo-600 text-white">Leader</span>}
+                            <label className="flex items-center gap-1 text-[11px] ml-2">
+                              <input
+                                type="radio"
+                                name="leader-edit"
+                                checked={leaderEdit === a.worker_id}
+                                onChange={() => setLeaderEdit(a.worker_id)}
+                              />
+                              Leader
+                            </label>
+                            {a.is_leader && leaderEdit !== a.worker_id && (
+                              <span className="text-[10px] text-gray-500">(current)</span>
+                            )}
                             <span className="text-xs italic">{a.status.replace('_',' ')}</span>
+                            <label className="ml-auto flex items-center gap-1 text-[11px] text-red-600">
+                              <input
+                                type="checkbox"
+                                checked={removeAssignmentIds.includes(a.id)}
+                                onChange={(e) => setRemoveAssignmentIds(prev => e.target.checked ? Array.from(new Set([...prev, a.id])) : prev.filter(id => id !== a.id))}
+                              />
+                              Remove
+                            </label>
                           </div>
                           {a.detail ? (
                             <div className="mt-1 text-xs text-gray-600 space-y-0.5">
+                              <div>
+                                <span className="font-medium">Assigned workers:</span> {assignments.map(w => `${w.name || w.email || w.worker_id}${w.is_leader ? ' (Leader)' : ''}`).join(', ')}
+                              </div>
                               <div>
                                 <span className="font-medium">Store:</span> {a.detail.store_name || '—'}
                               </div>
@@ -482,9 +523,50 @@ export default function SupervisorDashboard() {
                           ) : (
                             <div className="mt-1 text-xs text-gray-500">No details saved yet.</div>
                           )}
+                          {a.history && a.history.length > 0 && (
+                            <div className="mt-2 border-t pt-2">
+                              <p className="text-[11px] font-semibold text-gray-700 mb-1">Job History</p>
+                              <ul className="space-y-1">
+                                {a.history.map(h => (
+                                  <li key={h.visit_id} className="text-[11px] text-gray-700 border rounded p-1.5">
+                                    <div><span className="font-medium">Store:</span> {h.store_name || '—'}</div>
+                                    <div><span className="font-medium">Materials:</span> {h.materials?.length ? h.materials.join(', ') : '—'}</div>
+                                    <div><span className="font-medium">Time:</span> {h.time_in ? new Date(h.time_in).toLocaleString() : '—'} → {h.time_out ? new Date(h.time_out).toLocaleString() : '—'}</div>
+                                    <div><span className="font-medium">Revisit:</span> {h.needs_revisit ? 'Yes' : 'No'}</div>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>
+                    <div className="mt-2 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!selectedComplaint) return
+                          try {
+                            const res = await fetch(`/api/complaints/${selectedComplaint.id}/assignments`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ leader_id: leaderEdit, remove_assignment_ids: removeAssignmentIds })
+                            })
+                            if (!res.ok) {
+                              const msg = await res.json().catch(() => ({}))
+                              throw new Error(msg?.error || 'Failed to save changes')
+                            }
+                            // Refresh list
+                            await handleViewComplaint(selectedComplaint)
+                          } catch (e: any) {
+                            alert(e?.message || 'Failed to save changes')
+                          }
+                        }}
+                        className="px-3 py-1 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700"
+                      >
+                        Save changes
+                      </button>
+                    </div>
                   </div>
                 )}
 
