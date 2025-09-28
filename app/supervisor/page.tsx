@@ -197,6 +197,22 @@ export default function SupervisorDashboard() {
     }
   }
 
+  const updateAssignmentAction = async (id: number, action: 'approve' | 'reopen', note?: string) => {
+    try {
+      const res = await fetch(`/api/assignments/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, note })
+      })
+      if (!res.ok) throw new Error('Failed to update')
+      // Refresh current complaint view list
+      if (selectedComplaint) await handleViewComplaint(selectedComplaint)
+    } catch (e) {
+      console.error(e)
+      alert('Failed to update assignment status')
+    }
+  }
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.replace('/')
@@ -538,6 +554,25 @@ export default function SupervisorDashboard() {
                               </ul>
                             </div>
                           )}
+                          <div className="mt-2 flex items-center gap-2">
+                            <button
+                              className={`px-2 py-1 text-xs rounded ${a.status === 'pending_review' ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                              disabled={a.status !== 'pending_review'}
+                              onClick={() => updateAssignmentAction(a.id, 'approve')}
+                            >
+                              Confirm completion
+                            </button>
+                            <button
+                              className={`px-2 py-1 text-xs rounded ${a.status === 'pending_review' ? 'bg-yellow-600 text-white hover:bg-yellow-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                              disabled={a.status !== 'pending_review'}
+                              onClick={() => {
+                                const note = prompt('Reason to reopen?') || ''
+                                updateAssignmentAction(a.id, 'reopen', note)
+                              }}
+                            >
+                              Reopen
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>

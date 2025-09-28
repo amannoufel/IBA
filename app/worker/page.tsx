@@ -73,19 +73,20 @@ export default function WorkerDashboard() {
 
   
 
-  const updateAssignmentStatus = async (id: number, status: string) => {
+  const updateAssignmentAction = async (id: number, action: 'start' | 'mark_done') => {
     try {
-      const res = await fetch(`/api/assignments/${id}`, {
+      const res = await fetch(`/api/assignments/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ action })
       })
       if (!res.ok) throw new Error('Failed to update status')
+      const dj = await res.json().catch(() => ({} as { status?: string }))
       await fetchAssignments()
       // Update local detail view if same assignment
-      if (selected?.id === id) {
-        setSelected((prev) => (prev ? { ...prev, status } : prev))
-        setSelected((prev) => prev ? { ...prev, complaint: { ...prev.complaint, status } } : prev)
+      if (selected?.id === id && dj?.status) {
+        setSelected((prev) => (prev ? { ...prev, status: dj.status! } : prev))
+        setSelected((prev) => prev ? { ...prev, complaint: { ...prev.complaint, status: dj.status! } } : prev)
       }
     } catch (e) {
       console.error(e)
@@ -339,17 +340,23 @@ export default function WorkerDashboard() {
                       {saving ? 'Saving…' : 'Save'}
                     </button>
                     <div className="ml-auto flex items-center gap-2">
-                      {['accepted','in_progress','completed','rejected'].map(s => (
-                        <button
-                          key={s}
-                          onClick={() => selected && updateAssignmentStatus(selected.id, s)}
-                          className={`px-2 py-1 text-xs rounded border ${selected.status === s ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                        >
-                          {s.replace('_',' ')}
-                        </button>
-                      ))}
+                      <button
+                        onClick={() => selected && updateAssignmentAction(selected.id, 'start')}
+                        className={`px-2 py-1 text-xs rounded border ${selected.status === 'in_progress' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        in progress
+                      </button>
+                      <button
+                        onClick={() => selected && updateAssignmentAction(selected.id, 'mark_done')}
+                        className={`px-2 py-1 text-xs rounded border ${selected.status === 'pending_review' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        completed
+                      </button>
                     </div>
                   </div>
+                  {selected?.status === 'pending_review' && (
+                    <div className="text-xs text-gray-500">Awaiting supervisor confirmation…</div>
+                  )}
                   {history.length > 0 && (
                     <div className="mt-4 border-t pt-3">
                       <h3 className="text-sm font-medium mb-2">Job History</h3>

@@ -20,7 +20,8 @@ export async function PATCH(
   const status = body?.status?.toLowerCase()
   if (!status) return NextResponse.json({ error: 'status is required' }, { status: 400 })
 
-  const allowed = ['assigned', 'accepted', 'in_progress', 'completed', 'rejected'] as const
+  // Keep legacy compatibility but discourage use; prefer /status action endpoint
+  const allowed = ['in_progress', 'pending_review'] as const
   if (!allowed.includes(status as (typeof allowed)[number])) {
     return NextResponse.json({ error: 'invalid status' }, { status: 400 })
   }
