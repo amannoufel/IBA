@@ -12,7 +12,7 @@ export default function WorkerDashboard() {
   const [selected, setSelected] = useState<Assignment | null>(null)
   const [stores, setStores] = useState<Array<{ id: number; name: string }>>([])
   const [materials, setMaterials] = useState<Array<{ id: number; name: string }>>([])
-  const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [detail, setDetail] = useState<{ store_id: number | null; materials: number[]; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null>(null)
   const [history, setHistory] = useState<Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>>([])
   const [teammates, setTeammates] = useState<Array<{ worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }>>([])
@@ -142,44 +142,36 @@ export default function WorkerDashboard() {
     }
   }
 
-  const saveDetail = async () => {
-    if (!selected || !detail) return
+  const submitForReview = async () => {
+    if (!selected) return
     try {
-      setSaving(true)
-      const res = await fetch(`/api/assignments/${selected.id}/detail`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          store_id: detail.store_id,
-          materials: detail.materials,
-          time_in: detail.time_in,
-          time_out: detail.time_out,
-          needs_revisit: detail.needs_revisit,
+      setSubmitting(true)
+      // If leader, save details first
+      if (selected.is_leader && detail) {
+        const res = await fetch(`/api/assignments/${selected.id}/detail`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            store_id: detail.store_id,
+            materials: detail.materials,
+            time_in: detail.time_in,
+            time_out: detail.time_out,
+            needs_revisit: detail.needs_revisit,
+          })
         })
-      })
-      if (!res.ok) throw new Error('Failed to save details')
-      // Refresh assignments list so the left table reflects changes (e.g., status badges elsewhere)
-      await fetchAssignments()
-      // After save: if revisit is requested, keep the form open, refresh history, and reset inputs for the next visit.
-      // Otherwise, hide the details panel since the job's visit is completed.
-      if (detail.needs_revisit) {
-        try {
-          const dRes = await fetch(`/api/assignments/${selected.id}/detail`)
-          if (dRes.ok) {
-            const dj = await dRes.json() as { history?: Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }> }
-            setHistory(dj.history ?? [])
-          }
-        } catch {}
-        setDetail({ store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false })
-      } else {
-        setSelected(null)
+        if (!res.ok) {
+          let msg = 'Failed to save details'
+          try { const j = await res.json(); msg = j?.error || msg } catch {}
+          throw new Error(msg)
+        }
       }
-      alert('Saved')
+      // Then submit status for review
+      await updateAssignmentAction(selected.id, 'mark_done')
     } catch (e) {
       console.error(e)
-      alert('Failed to save')
+      alert((e as Error).message || 'Failed to submit for review')
     } finally {
-      setSaving(false)
+      setSubmitting(false)
     }
   }
 
@@ -333,8 +325,7 @@ export default function WorkerDashboard() {
                     <label htmlFor="needs-revisit" className="text-sm text-slate-700">Attended once but need to revisit</label>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={saveDetail} disabled={saving || !selected.is_leader} className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${saving || !selected.is_leader ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}>{saving ? 'Saving…' : 'Save'}</button>
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="ml-auto flex items-center gap-2 w-full justify-end">
                       <button
                         onClick={() => selected && updateAssignmentAction(selected.id, 'start')}
                         disabled={selected.status === 'in_progress' || selected.status === 'pending_review' || selected.status === 'completed'}
@@ -343,11 +334,11 @@ export default function WorkerDashboard() {
                         in progress
                       </button>
                       <button
-                        onClick={() => selected && updateAssignmentAction(selected.id, 'mark_done')}
-                        disabled={selected.status === 'pending_review' || selected.status === 'completed'}
-                        className={`px-2 py-1 text-xs rounded border ${selected.status === 'pending_review' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'} ${selected.status === 'pending_review' || selected.status === 'completed' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={submitForReview}
+                        disabled={submitting || selected.status === 'pending_review' || selected.status === 'completed'}
+                        className={`px-2 py-1 text-xs rounded border ${selected.status === 'pending_review' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'} ${(submitting || selected.status === 'pending_review' || selected.status === 'completed') ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        Submit for review
+                        {submitting ? 'Submitting…' : 'Submit for review'}
                       </button>
                     </div>
                   </div>
