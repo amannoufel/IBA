@@ -5,7 +5,9 @@ import type { Database } from '../../../types/supabase'
 
 export async function GET() {
   const cookieStore = await cookies()
-  const supabase = createRouteHandlerClient<Database>({ cookies: (() => cookieStore) as unknown as () => Promise<ReturnType<typeof cookies>> })
+  const supabase = createRouteHandlerClient<Database>({
+    cookies: (() => cookieStore) as unknown as typeof cookies,
+  })
 
   try {
     // Verify user is authenticated
