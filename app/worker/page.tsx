@@ -16,6 +16,7 @@ export default function WorkerDashboard() {
   const [detail, setDetail] = useState<{ store_id: number | null; materials: number[]; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null>(null)
   const [history, setHistory] = useState<Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>>([])
   const [teammates, setTeammates] = useState<Array<{ assignment_id: number; worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }>>([])
+  const [teammatesUnavailable, setTeammatesUnavailable] = useState(false)
   const [teamOverrides, setTeamOverrides] = useState<Record<number, { end_at: string }>>({}) // key: assignment_id
   const router = useRouter()
   const supabase = useSupabase()
@@ -131,7 +132,7 @@ export default function WorkerDashboard() {
     try {
       const dRes = await fetch(`/api/assignments/${a.id}/detail`)
       if (dRes.ok) {
-  const d = await dRes.json() as { detail: { store_id: number | null; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null; materials_used: number[]; history?: Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>; teammates?: Array<{ assignment_id: number; worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }> }
+        const d = await dRes.json() as { detail: { store_id: number | null; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null; materials_used: number[]; history?: Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>; teammates?: Array<{ assignment_id: number; worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }>; teammates_unavailable?: boolean }
         setDetail({
           store_id: d.detail?.store_id ?? null,
           materials: d.materials_used ?? [],
@@ -140,17 +141,20 @@ export default function WorkerDashboard() {
           needs_revisit: d.detail?.needs_revisit ?? false,
         })
         setHistory(d.history ?? [])
-  setTeammates(d.teammates ?? [])
-  setTeamOverrides({})
+        setTeammates(d.teammates ?? [])
+        setTeamOverrides({})
+        setTeammatesUnavailable(!!d.teammates_unavailable)
       } else {
         setDetail({ store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false })
         setHistory([])
         setTeammates([])
+        setTeammatesUnavailable(false)
       }
     } catch {
       setDetail({ store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false })
       setHistory([])
       setTeammates([])
+      setTeammatesUnavailable(false)
     }
   }
 
@@ -197,8 +201,6 @@ export default function WorkerDashboard() {
     } catch (e) {
       console.error(e)
       alert((e as Error).message || 'Failed to submit for review')
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -369,27 +371,40 @@ export default function WorkerDashboard() {
                       </button>
                     </div>
                   </div>
-                      {selected?.is_leader && teammates.length > 0 && (
+                      {selected?.is_leader && (
                         <div className="mt-3 border-t border-slate-200 pt-3">
-                          <h4 className="text-xs font-semibold text-slate-700 mb-2">Team end times (optional)</h4>
-                          <p className="text-xs text-slate-500 mb-2">If a worker left early or switched jobs, set their end time. Others inherit your end time.</p>
-                          <div className="space-y-2">
-                            {teammates.map(t => (
-                              <div key={t.worker_id} className="flex items-center gap-2">
-                                <div className="text-xs w-44 truncate">{t.name || t.email || t.worker_id}{t.is_leader ? ' (Leader)' : ''}</div>
-                                <input
-                                  type="datetime-local"
-                                  className="border rounded px-2 py-1 text-xs"
-                                  value={toLocalInput(teamOverrides[t.assignment_id]?.end_at)}
-                                  onChange={(e) => {
-                                    const aid = t.assignment_id
-                                    const v = e.target.value
-                                    setTeamOverrides(prev => ({ ...prev, [aid]: { end_at: v ? new Date(v).toISOString() : '' } }))
-                                  }}
-                                />
-                              </div>
-                            ))}
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-xs font-semibold text-slate-700">Team end times (optional)</h4>
+                            <button
+                              type="button"
+                              onClick={() => selected && openDetail(selected)}
+                              className="text-[11px] text-indigo-600 hover:text-indigo-800"
+                            >Refresh</button>
                           </div>
+                          <p className="text-xs text-slate-500 mb-2">If a worker left early or switched jobs, set their end time. Others inherit your end time.</p>
+                          {teammates.length > 0 ? (
+                            <div className="space-y-2">
+                              {teammates.map(t => (
+                                <div key={t.worker_id} className="flex items-center gap-2">
+                                  <div className="text-xs w-44 truncate">{t.name || t.email || t.worker_id}{t.is_leader ? ' (Leader)' : ''}</div>
+                                  <input
+                                    type="datetime-local"
+                                    className="border rounded px-2 py-1 text-xs"
+                                    value={toLocalInput(teamOverrides[t.assignment_id]?.end_at)}
+                                    onChange={(e) => {
+                                      const aid = t.assignment_id
+                                      const v = e.target.value
+                                      setTeamOverrides(prev => ({ ...prev, [aid]: { end_at: v ? new Date(v).toISOString() : '' } }))
+                                    }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-slate-500">
+                              {teammatesUnavailable ? 'Team list is temporarily unavailable. Apply migrations and refresh.' : 'No teammates found for this job.'}
+                            </div>
+                          )}
                         </div>
                       )}
                   {selected?.status === 'pending_review' && (

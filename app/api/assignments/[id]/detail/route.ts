@@ -96,17 +96,42 @@ export async function GET(
 
   // Teammates via RPC (respects auth but bypasses overly strict RLS by running as definer)
   let teammates: Array<{ assignment_id: number; worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }> = []
+  let teammatesUnavailable = false
   {
-    const { data: trows } = await supabase
+    const { data: trows, error: trpcErr } = await supabase
       .rpc('get_teammates_for_assignment', { aid: assignmentId })
     type TRow = { assignment_id: number; worker_id: string; email: string | null; name: string | null; is_leader: boolean }
-    teammates = ((trows ?? []) as TRow[]).map(t => ({
-      assignment_id: t.assignment_id,
-      worker_id: t.worker_id,
-      email: t.email,
-      name: t.name,
-      is_leader: !!t.is_leader,
-    }))
+    if (!trpcErr && (trows?.length ?? 0) > 0) {
+      teammates = ((trows ?? []) as TRow[]).map(t => ({
+        assignment_id: t.assignment_id,
+        worker_id: t.worker_id,
+        email: t.email,
+        name: t.name,
+        is_leader: !!t.is_leader,
+      }))
+    } else {
+      // Fallback: try to resolve complaint_id and select teammates directly (works if RLS policy exists)
+      const { data: compRow } = await supabase
+        .from('complaint_assignments')
+        .select('complaint_id')
+        .eq('id', assignmentId)
+        .single()
+      if (compRow?.complaint_id) {
+        type TeamRow = { id: number; worker_id: string; is_leader: boolean | null; profiles?: { email?: string | null; name?: string | null } | null }
+        const { data: teamRows } = await supabase
+          .from('complaint_assignments')
+          .select('id, worker_id, is_leader, profiles:worker_id (email, name)')
+          .eq('complaint_id', compRow.complaint_id)
+        teammates = ((teamRows ?? []) as TeamRow[]).map((t) => ({
+          assignment_id: t.id,
+          worker_id: t.worker_id,
+          email: t.profiles?.email ?? null,
+          name: t.profiles?.name ?? null,
+          is_leader: !!t.is_leader,
+        }))
+      }
+      if (teammates.length === 0) teammatesUnavailable = true
+    }
   }
 
   return NextResponse.json({
@@ -123,6 +148,7 @@ export async function GET(
     materials_used: matsList.map((m) => m.material_id),
     history,
     teammates,
+    teammates_unavailable: teammatesUnavailable,
   })
 }
 
