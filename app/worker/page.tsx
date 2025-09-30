@@ -17,7 +17,9 @@ export default function WorkerDashboard() {
   const [history, setHistory] = useState<Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>>([])
   const [teammates, setTeammates] = useState<Array<{ assignment_id: number; worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }>>([])
   const [teammatesUnavailable, setTeammatesUnavailable] = useState(false)
-  const [teamOverrides, setTeamOverrides] = useState<Record<number, { end_at: string }>>({}) // key: assignment_id
+  // Multi-interval session overrides per teammate (keyed by worker_id)
+  type IntervalEdit = { start: string; end: string }
+  const [teamSessions, setTeamSessions] = useState<Record<string, IntervalEdit[]>>({})
   const router = useRouter()
   const supabase = useSupabase()
 
@@ -141,20 +143,22 @@ export default function WorkerDashboard() {
           needs_revisit: d.detail?.needs_revisit ?? false,
         })
         setHistory(d.history ?? [])
-        setTeammates(d.teammates ?? [])
-        setTeamOverrides({})
+  setTeammates(d.teammates ?? [])
+  setTeamSessions({})
         setTeammatesUnavailable(!!d.teammates_unavailable)
       } else {
         setDetail({ store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false })
         setHistory([])
-        setTeammates([])
-        setTeammatesUnavailable(false)
+  setTeammates([])
+  setTeamSessions({})
+  setTeammatesUnavailable(false)
       }
     } catch {
       setDetail({ store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false })
       setHistory([])
-      setTeammates([])
-      setTeammatesUnavailable(false)
+  setTeammates([])
+  setTeamSessions({})
+  setTeammatesUnavailable(false)
     }
   }
 
@@ -181,16 +185,19 @@ export default function WorkerDashboard() {
           throw new Error(msg)
         }
       }
-      // Build overrides (leader only)
-      let overrides: Array<{ assignment_id: number; end_at?: string }> = []
-      if (selected.is_leader && Object.keys(teamOverrides).length > 0) {
-        overrides = Object.entries(teamOverrides).map(([aid, v]) => ({ assignment_id: Number(aid), end_at: v.end_at }))
-      }
+      // Build multi-interval overrides (leader only)
+      const sessionsPayload = selected.is_leader ? Object.entries(teamSessions).map(([worker_id, intervals]) => ({
+        worker_id,
+        intervals: intervals
+          .filter(iv => iv.start && iv.end)
+          .map(iv => ({ start_at: new Date(iv.start).toISOString(), end_at: new Date(iv.end).toISOString() })),
+      })).filter(s => s.intervals.length > 0) : []
+
       // Then submit status for review with overrides
       const res2 = await fetch(`/api/assignments/${selected.id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'mark_done', overrides })
+        body: JSON.stringify({ action: 'mark_done', overrides: { sessions: sessionsPayload } })
       })
       if (!res2.ok) {
         let msg = 'Failed to submit for review'
@@ -374,29 +381,54 @@ export default function WorkerDashboard() {
                       {selected?.is_leader && (
                         <div className="mt-3 border-t border-slate-200 pt-3">
                           <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-xs font-semibold text-slate-700">Team end times (optional)</h4>
+                            <h4 className="text-xs font-semibold text-slate-700">Team sessions (optional)</h4>
                             <button
                               type="button"
                               onClick={() => selected && openDetail(selected)}
                               className="text-[11px] text-indigo-600 hover:text-indigo-800"
                             >Refresh</button>
                           </div>
-                          <p className="text-xs text-slate-500 mb-2">If a worker left early or switched jobs, set their end time. Others inherit your end time.</p>
+                          <p className="text-xs text-slate-500 mb-2">If a worker left and later rejoined, add multiple in/out intervals. Others inherit your visit time.</p>
                           {teammates.length > 0 ? (
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                               {teammates.map(t => (
-                                <div key={t.worker_id} className="flex items-center gap-2">
-                                  <div className="text-xs w-44 truncate">{t.name || t.email || t.worker_id}{t.is_leader ? ' (Leader)' : ''}</div>
-                                  <input
-                                    type="datetime-local"
-                                    className="border rounded px-2 py-1 text-xs"
-                                    value={toLocalInput(teamOverrides[t.assignment_id]?.end_at)}
-                                    onChange={(e) => {
-                                      const aid = t.assignment_id
-                                      const v = e.target.value
-                                      setTeamOverrides(prev => ({ ...prev, [aid]: { end_at: v ? new Date(v).toISOString() : '' } }))
-                                    }}
-                                  />
+                                <div key={t.worker_id} className="">
+                                  <div className="text-xs font-medium mb-1">{t.name || t.email || t.worker_id}{t.is_leader ? ' (Leader)' : ''}</div>
+                                  {(teamSessions[t.worker_id] ?? []).map((iv, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 mb-2">
+                                      <input
+                                        type="datetime-local"
+                                        className="border rounded px-2 py-1 text-xs"
+                                        value={iv.start}
+                                        onChange={(e) => setTeamSessions(prev => {
+                                          const list = [...(prev[t.worker_id] ?? [])]
+                                          list[idx] = { ...list[idx], start: e.target.value }
+                                          return { ...prev, [t.worker_id]: list }
+                                        })}
+                                      />
+                                      <span className="text-xs">to</span>
+                                      <input
+                                        type="datetime-local"
+                                        className="border rounded px-2 py-1 text-xs"
+                                        value={iv.end}
+                                        onChange={(e) => setTeamSessions(prev => {
+                                          const list = [...(prev[t.worker_id] ?? [])]
+                                          list[idx] = { ...list[idx], end: e.target.value }
+                                          return { ...prev, [t.worker_id]: list }
+                                        })}
+                                      />
+                                      <button type="button" className="text-[11px] text-red-600" onClick={() => setTeamSessions(prev => {
+                                        const list = [...(prev[t.worker_id] ?? [])]
+                                        list.splice(idx, 1)
+                                        return { ...prev, [t.worker_id]: list }
+                                      })}>Remove</button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    className="text-[11px] text-indigo-600"
+                                    onClick={() => setTeamSessions(prev => ({ ...prev, [t.worker_id]: [...(prev[t.worker_id] ?? []), { start: '', end: '' }] }))}
+                                  >Add interval</button>
                                 </div>
                               ))}
                             </div>
