@@ -20,6 +20,16 @@ export default function WorkerDashboard() {
   const router = useRouter()
   const supabase = useSupabase()
 
+  // Format an ISO timestamp (UTC or with zone) to a local datetime-local input value (YYYY-MM-DDTHH:mm)
+  const toLocalInput = (iso?: string | null) => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    const tzOffset = d.getTimezoneOffset() // minutes
+    const local = new Date(d.getTime() - tzOffset * 60000)
+    return local.toISOString().slice(0, 16)
+  }
+
   const fetchAssignments = useCallback(async () => {
     try {
       const res = await fetch('/api/assignments/mine')
@@ -315,7 +325,7 @@ export default function WorkerDashboard() {
                       <input
                         type="datetime-local"
                         disabled={!selected.is_leader}
-                        value={detail?.time_in ? new Date(detail.time_in).toISOString().slice(0,16) : ''}
+                        value={toLocalInput(detail?.time_in)}
                         onChange={(e) => setDetail((d) => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), time_in: e.target.value ? new Date(e.target.value).toISOString() : null }))}
                         className="mt-1 block w-full disabled:opacity-60"
                       />
@@ -325,7 +335,7 @@ export default function WorkerDashboard() {
                       <input
                         type="datetime-local"
                         disabled={!selected.is_leader}
-                        value={detail?.time_out ? new Date(detail.time_out).toISOString().slice(0,16) : ''}
+                        value={toLocalInput(detail?.time_out)}
                         onChange={(e) => setDetail((d) => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), time_out: e.target.value ? new Date(e.target.value).toISOString() : null }))}
                         className="mt-1 block w-full disabled:opacity-60"
                       />
@@ -370,7 +380,7 @@ export default function WorkerDashboard() {
                                 <input
                                   type="datetime-local"
                                   className="border rounded px-2 py-1 text-xs"
-                                  value={teamOverrides[t.assignment_id]?.end_at ? new Date(teamOverrides[t.assignment_id].end_at).toISOString().slice(0,16) : ''}
+                                  value={toLocalInput(teamOverrides[t.assignment_id]?.end_at)}
                                   onChange={(e) => {
                                     const aid = t.assignment_id
                                     const v = e.target.value
