@@ -15,7 +15,8 @@ export default function WorkerDashboard() {
   const [submitting, setSubmitting] = useState(false)
   const [detail, setDetail] = useState<{ store_id: number | null; materials: number[]; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null>(null)
   const [history, setHistory] = useState<Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>>([])
-  const [teammates, setTeammates] = useState<Array<{ worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }>>([])
+  const [teammates, setTeammates] = useState<Array<{ assignment_id: number; worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }>>([])
+  const [teamOverrides, setTeamOverrides] = useState<Record<number, { end_at: string }>>({}) // key: assignment_id
   const router = useRouter()
   const supabase = useSupabase()
 
@@ -120,7 +121,7 @@ export default function WorkerDashboard() {
     try {
       const dRes = await fetch(`/api/assignments/${a.id}/detail`)
       if (dRes.ok) {
-        const d = await dRes.json() as { detail: { store_id: number | null; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null; materials_used: number[]; history?: Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>; teammates?: Array<{ worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }> }
+  const d = await dRes.json() as { detail: { store_id: number | null; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null; materials_used: number[]; history?: Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>; teammates?: Array<{ assignment_id: number; worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }> }
         setDetail({
           store_id: d.detail?.store_id ?? null,
           materials: d.materials_used ?? [],
@@ -129,7 +130,8 @@ export default function WorkerDashboard() {
           needs_revisit: d.detail?.needs_revisit ?? false,
         })
         setHistory(d.history ?? [])
-        setTeammates(d.teammates ?? [])
+  setTeammates(d.teammates ?? [])
+  setTeamOverrides({})
       } else {
         setDetail({ store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false })
         setHistory([])
@@ -165,8 +167,23 @@ export default function WorkerDashboard() {
           throw new Error(msg)
         }
       }
-      // Then submit status for review
-      await updateAssignmentAction(selected.id, 'mark_done')
+      // Build overrides (leader only)
+      let overrides: Array<{ assignment_id: number; end_at?: string }> = []
+      if (selected.is_leader && Object.keys(teamOverrides).length > 0) {
+        overrides = Object.entries(teamOverrides).map(([aid, v]) => ({ assignment_id: Number(aid), end_at: v.end_at }))
+      }
+      // Then submit status for review with overrides
+      const res2 = await fetch(`/api/assignments/${selected.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark_done', overrides })
+      })
+      if (!res2.ok) {
+        let msg = 'Failed to submit for review'
+        try { const j = await res2.json(); msg = j?.error || msg } catch {}
+        throw new Error(msg)
+      }
+      await fetchAssignments()
     } catch (e) {
       console.error(e)
       alert((e as Error).message || 'Failed to submit for review')
@@ -325,7 +342,7 @@ export default function WorkerDashboard() {
                     <label htmlFor="needs-revisit" className="text-sm text-slate-700">Attended once but need to revisit</label>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="ml-auto flex items-center gap-2 w-full justify-end">
+                        <div className="ml-auto flex items-center gap-2 w-full justify-end">
                       <button
                         onClick={() => selected && updateAssignmentAction(selected.id, 'start')}
                         disabled={selected.status === 'in_progress' || selected.status === 'pending_review' || selected.status === 'completed'}
@@ -342,6 +359,29 @@ export default function WorkerDashboard() {
                       </button>
                     </div>
                   </div>
+                      {selected?.is_leader && teammates.length > 0 && (
+                        <div className="mt-3 border-t border-slate-200 pt-3">
+                          <h4 className="text-xs font-semibold text-slate-700 mb-2">Team end times (optional)</h4>
+                          <p className="text-xs text-slate-500 mb-2">If a worker left early or switched jobs, set their end time. Others inherit your end time.</p>
+                          <div className="space-y-2">
+                            {teammates.map(t => (
+                              <div key={t.worker_id} className="flex items-center gap-2">
+                                <div className="text-xs w-44 truncate">{t.name || t.email || t.worker_id}{t.is_leader ? ' (Leader)' : ''}</div>
+                                <input
+                                  type="datetime-local"
+                                  className="border rounded px-2 py-1 text-xs"
+                                  value={teamOverrides[t.assignment_id]?.end_at ? new Date(teamOverrides[t.assignment_id].end_at).toISOString().slice(0,16) : ''}
+                                  onChange={(e) => {
+                                    const aid = t.assignment_id
+                                    const v = e.target.value
+                                    setTeamOverrides(prev => ({ ...prev, [aid]: { end_at: v ? new Date(v).toISOString() : '' } }))
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                   {selected?.status === 'pending_review' && (
                     <div className="text-xs text-slate-500">Awaiting supervisor confirmation…</div>
                   )}

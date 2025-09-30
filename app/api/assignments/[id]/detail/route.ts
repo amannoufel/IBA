@@ -101,14 +101,15 @@ export async function GET(
     .select('complaint_id')
     .eq('id', assignmentId)
     .single()
-  let teammates: Array<{ worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }> = []
+  let teammates: Array<{ assignment_id: number; worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }> = []
   if (complaintRow?.complaint_id) {
-    type TeamRow = { worker_id: string; is_leader: boolean | null; profiles?: { email?: string | null; name?: string | null } | null }
+    type TeamRow = { id: number; worker_id: string; is_leader: boolean | null; profiles?: { email?: string | null; name?: string | null } | null }
     const { data: teamRows } = await supabase
       .from('complaint_assignments')
-      .select('worker_id, is_leader, profiles:worker_id (email, name)')
+      .select('id, worker_id, is_leader, profiles:worker_id (email, name)')
       .eq('complaint_id', complaintRow.complaint_id)
     teammates = ((teamRows ?? []) as TeamRow[]).map((t) => ({
+      assignment_id: t.id,
       worker_id: t.worker_id,
       email: t.profiles?.email ?? null,
       name: t.profiles?.name ?? null,
