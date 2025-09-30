@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useSupabase } from '../lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 
 type Complaint = {
   id: number
@@ -235,7 +236,10 @@ export default function SupervisorDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-xl font-semibold">Supervisor Dashboard</h1>
-            <button onClick={handleSignOut} className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50">Sign Out</button>
+            <div className="flex items-center gap-2">
+              <Link href="/supervisor/reports" className="px-4 py-2 text-sm rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">Reports</Link>
+              <button onClick={handleSignOut} className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50">Sign Out</button>
+            </div>
           </div>
         </div>
       </nav>

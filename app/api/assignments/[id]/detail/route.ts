@@ -130,7 +130,9 @@ export async function GET(
           is_leader: !!t.is_leader,
         }))
       }
-      if (teammates.length === 0) teammatesUnavailable = true
+      // If fallback returns only self, signal unavailability so UI can display a helpful hint.
+      // This typically happens when the secure RPC or RLS policy hasn't been applied yet.
+      if (teammates.length <= 1) teammatesUnavailable = true
     }
   }
 
