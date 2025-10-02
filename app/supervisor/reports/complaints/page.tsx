@@ -4,12 +4,38 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSupabase } from '../../../lib/supabase-client'
 import { useRouter } from 'next/navigation'
 
+type WorkDetail = {
+  assignment_id: number
+  worker_id: string
+  worker_name: string | null
+  worker_email: string | null
+  store_id: number | null
+  store_name: string | null
+  time_in: string | null
+  time_out: string | null
+  needs_revisit: boolean
+  materials: string[] | null
+}
+
+type ComplaintRow = {
+  complaint_id: number
+  created_at: string
+  tenant_id: string
+  tenant_name: string | null
+  tenant_email: string | null
+  building: string | null
+  flat: string | null
+  description: string | null
+  staff: string | null
+  work_details: WorkDetail[] | null
+}
+
 export default function ComplaintReportsPage() {
   const supabase = useSupabase()
   const router = useRouter()
   const [start, setStart] = useState<string>('')
   const [end, setEnd] = useState<string>('')
-  const [rows, setRows] = useState<any[] | null>(null)
+  const [rows, setRows] = useState<ComplaintRow[] | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -46,11 +72,7 @@ export default function ComplaintReportsPage() {
     window.open(url, '_blank')
   }
 
-  const downloadCsv = () => {
-    // CSV isn’t implemented for this endpoint, but we can easily extend it later.
-    // For now, we’ll transform on the client if needed; or you can rely on the Excel button.
-    alert('CSV export is not implemented yet. Please use the Excel export.')
-  }
+  // CSV export can be added similarly to the worker report if needed.
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -101,7 +123,7 @@ export default function ComplaintReportsPage() {
                   <td className="px-3 py-2">
                     {Array.isArray(r.work_details) && r.work_details.length > 0 ? (
                       <ul className="space-y-1">
-                        {r.work_details.map((w: any, idx: number) => (
+                        {r.work_details.map((w: WorkDetail, idx: number) => (
                           <li key={idx} className="border rounded p-2 bg-slate-50">
                             <div className="text-xs text-slate-600 mb-1">{w.worker_name || w.worker_email || w.worker_id}</div>
                             <div><span className="font-medium">Store:</span> {w.store_name || '—'}</div>

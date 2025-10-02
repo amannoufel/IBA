@@ -3,6 +3,32 @@ import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import type { Database } from '../../../types/supabase'
 
+type WorkDetail = {
+  assignment_id: number
+  worker_id: string
+  worker_name: string | null
+  worker_email: string | null
+  store_id: number | null
+  store_name: string | null
+  time_in: string | null
+  time_out: string | null
+  needs_revisit: boolean
+  materials: string[] | null
+}
+
+type ComplaintReportRow = {
+  complaint_id: number
+  created_at: string
+  tenant_id: string
+  tenant_name: string | null
+  tenant_email: string | null
+  building: string | null
+  flat: string | null
+  description: string | null
+  staff: string | null
+  work_details: WorkDetail[] | null
+}
+
 export async function GET(request: NextRequest) {
   const cookieStore = await cookies()
   const supabase = createRouteHandlerClient<Database>({ cookies: (() => cookieStore) as unknown as typeof cookies })
@@ -24,18 +50,7 @@ export async function GET(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-  const rows = (data ?? []) as Array<{
-    complaint_id: number
-    created_at: string
-    tenant_id: string
-    tenant_name: string | null
-    tenant_email: string | null
-    building: string | null
-    flat: string | null
-    description: string | null
-    staff: string | null
-    work_details: any[]
-  }>
+  const rows = (data ?? []) as ComplaintReportRow[]
 
   if (format === 'xlsx') {
     const ExcelJS = await import('exceljs')
@@ -58,8 +73,8 @@ export async function GET(request: NextRequest) {
     ]
 
     for (const r of rows) {
-      const workSummary = Array.isArray(r.work_details) && r.work_details.length
-        ? r.work_details.map((w: any) => {
+      const workSummary = Array.isArray(r.work_details) && r.work_details.length > 0
+        ? r.work_details.map((w: WorkDetail) => {
             const who = w.worker_name || w.worker_email || w.worker_id
             const time = `${w.time_in ? new Date(w.time_in).toLocaleString() : '—'} → ${w.time_out ? new Date(w.time_out).toLocaleString() : '—'}`
             const store = w.store_name || '—'
