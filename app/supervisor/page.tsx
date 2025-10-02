@@ -16,6 +16,7 @@ type Complaint = {
   category: string
   description: string
   status: string
+  priority?: 'low' | 'medium' | 'high'
   image_url: string | null
   created_at: string
 }
@@ -30,6 +31,7 @@ export default function SupervisorDashboard() {
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
   const [removeAssignmentIds, setRemoveAssignmentIds] = useState<number[]>([])
   const [leaderEdit, setLeaderEdit] = useState<string | null>(null)
+  const [priorityFilter, setPriorityFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all')
   const [assignments, setAssignments] = useState<Array<{
     id: number;
     worker_id: string;
@@ -37,6 +39,8 @@ export default function SupervisorDashboard() {
     email?: string;
     name?: string | null;
     is_leader?: boolean;
+    scheduled_start?: string | null;
+    scheduled_end?: string | null;
     detail?: {
       store_id: number | null;
       store_name: string | null;
@@ -49,8 +53,23 @@ export default function SupervisorDashboard() {
   }>>([])
   const [canAddAssignments, setCanAddAssignments] = useState<boolean>(true)
   const [leaderSelection, setLeaderSelection] = useState<string | null>(null)
+  // Suggested scheduling (advisory)
+  const [scheduledStart, setScheduledStart] = useState<string>('')
+  const [scheduledEnd, setScheduledEnd] = useState<string>('')
+  const [availabilityBusy, setAvailabilityBusy] = useState<Array<{ worker_id: string; source: string; start_at: string; end_at: string; complaint_id: number | null; assignment_id: number | null }>>([])
+  const [availabilityLoading, setAvailabilityLoading] = useState(false)
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = useSupabase()
+  type Priority = 'low' | 'medium' | 'high'
+  const nextPriority = (p: Priority): Priority => (p === 'low' ? 'medium' : p === 'medium' ? 'high' : 'low')
+  const priorityBtnClass = (p: Priority) => (
+    p === 'high'
+      ? 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 hover:bg-red-100 transition'
+      : p === 'medium'
+      ? 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 hover:bg-amber-100 transition'
+      : 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-100 transition'
+  )
 
   useEffect(() => {
     const checkUser = async () => {
@@ -89,7 +108,8 @@ export default function SupervisorDashboard() {
   const fetchComplaints = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/complaints/all')
+      const qs = priorityFilter === 'all' ? '' : `?priority=${priorityFilter}`
+      const response = await fetch(`/api/complaints/all${qs}`)
       if (!response.ok) {
         throw new Error('Failed to fetch complaints')
       }
@@ -105,11 +125,16 @@ export default function SupervisorDashboard() {
   const handleViewComplaint = (complaint: Complaint) => {
     setSelectedComplaint(complaint)
     setIsModalOpen(true)
+    // Reset schedule UI state on open
+    setScheduledStart('')
+    setScheduledEnd('')
+    setAvailabilityBusy([])
+    setAvailabilityError(null)
     // Load current assignments for this complaint
     fetch(`/api/complaints/${complaint.id}/assignments`).then(async (r) => {
       if (!r.ok) return
       type ApiAssignment = {
-        id: number; worker_id: string; status: string; is_leader?: boolean;
+        id: number; worker_id: string; status: string; is_leader?: boolean; scheduled_start?: string | null; scheduled_end?: string | null;
         profiles?: { email?: string | null; name?: string | null } | null;
         detail?: { store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }
       }
@@ -118,17 +143,19 @@ export default function SupervisorDashboard() {
       const arr: ApiAssignment[] = Array.isArray(data) ? data : (data.assignments ?? [])
       setCanAddAssignments(Array.isArray(data) ? true : Boolean(data.can_add_assignments ?? true))
       type RawAssignment = {
-        id: number; worker_id: string; status: string; is_leader?: boolean;
+        id: number; worker_id: string; status: string; is_leader?: boolean; scheduled_start?: string | null; scheduled_end?: string | null;
         profiles?: { email?: string | null; name?: string | null } | null;
         detail?: { store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }
       }
-      const base: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null; is_leader?: boolean; detail?: RawAssignment['detail'] }>= (arr as RawAssignment[]).map((a) => ({
+      const base: Array<{ id: number; worker_id: string; status: string; email?: string; name?: string | null; is_leader?: boolean; scheduled_start?: string | null; scheduled_end?: string | null; detail?: RawAssignment['detail'] }>= (arr as RawAssignment[]).map((a) => ({
         id: a.id,
         worker_id: a.worker_id,
         status: a.status,
         is_leader: !!a.is_leader,
         email: a.profiles?.email ?? undefined,
         name: a.profiles?.name ?? undefined,
+        scheduled_start: a.scheduled_start ?? null,
+        scheduled_end: a.scheduled_end ?? null,
         detail: a.detail,
       }))
       // Fetch each assignment's full history in parallel
@@ -174,6 +201,48 @@ export default function SupervisorDashboard() {
     }
   }
 
+  const toIso = (val: string | null | undefined) => {
+    if (!val) return null
+    try { return new Date(val).toISOString() } catch { return null }
+  }
+
+  const formatLocal = (val?: string | null) => {
+    if (!val) return '—'
+    try { return new Date(val).toLocaleString() } catch { return val }
+  }
+
+  const checkAvailability = async () => {
+    setAvailabilityError(null)
+    setAvailabilityBusy([])
+    if (!scheduledStart) {
+      setAvailabilityError('Please pick a start time first.')
+      return
+    }
+    if (selectedWorkers.length === 0) {
+      setAvailabilityError('Select at least one worker to check availability.')
+      return
+    }
+    const day = scheduledStart.slice(0, 10)
+    try {
+      setAvailabilityLoading(true)
+      const res = await fetch(`/api/workers/availability?day=${encodeURIComponent(day)}&workerIds=${encodeURIComponent(selectedWorkers.join(','))}`)
+      const dj = await res.json().catch(() => ({})) as { busy?: Array<{ worker_id: string; source: string; start_at: string; end_at: string; complaint_id: number | null; assignment_id: number | null }>; error?: string }
+      if (!res.ok) throw new Error(dj?.error || 'Failed to fetch availability')
+      setAvailabilityBusy(dj.busy ?? [])
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to fetch availability'
+      setAvailabilityError(msg)
+    } finally {
+      setAvailabilityLoading(false)
+    }
+  }
+
+  // Clear availability preview when schedule or selection changes
+  useEffect(() => {
+    setAvailabilityBusy([])
+    setAvailabilityError(null)
+  }, [scheduledStart, scheduledEnd, selectedWorkers.join(',')])
+
   const handleAssign = async () => {
     if (!selectedComplaint || selectedWorkers.length === 0) return
     // Front-end guard: if no assignments yet (first-time assignment), require a leader selection among selected workers
@@ -186,7 +255,12 @@ export default function SupervisorDashboard() {
       const res = await fetch(`/api/complaints/${selectedComplaint.id}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ worker_ids: selectedWorkers, leader_id: leaderSelection })
+        body: JSON.stringify({
+          worker_ids: selectedWorkers,
+          leader_id: leaderSelection,
+          scheduled_start: toIso(scheduledStart),
+          scheduled_end: toIso(scheduledEnd),
+        })
       })
       if (!res.ok) throw new Error('Failed to assign workers')
       const data = await res.json()
@@ -194,12 +268,23 @@ export default function SupervisorDashboard() {
       type Inserted = { id: number; worker_id: string; status: string; is_leader?: boolean }
       const appended: Inserted[] = (data || []) as Inserted[]
       setAssignments((prev) => {
-        const merged = [...prev, ...appended.map((a) => ({ id: a.id, worker_id: a.worker_id, status: a.status, is_leader: !!a.is_leader }))]
+        const merged = [
+          ...prev,
+          ...appended.map((a) => ({
+            id: a.id,
+            worker_id: a.worker_id,
+            status: a.status,
+            is_leader: !!a.is_leader,
+            scheduled_start: toIso(scheduledStart),
+            scheduled_end: toIso(scheduledEnd),
+          }))
+        ]
         const existingLeader = merged.find(m => m.is_leader)
         setLeaderSelection(existingLeader ? existingLeader.worker_id : leaderSelection)
         return merged
       })
       setSelectedWorkers([])
+      // Keep schedule values for further batches, user can clear manually if desired
     } catch (e) {
       console.error(e)
     } finally {
@@ -247,6 +332,25 @@ export default function SupervisorDashboard() {
         <div className="px-4 py-6 sm:px-0">
           <div className="rounded-xl border border-slate-200 bg-white/80 shadow-sm p-4 overflow-auto">
             <h2 className="text-lg font-medium mb-4">All Tenant Complaints</h2>
+            <div className="flex items-center gap-2 mb-3">
+              <label className="text-sm text-slate-600">Priority:</label>
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value as 'all' | 'low' | 'medium' | 'high')}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <button
+                className="ml-2 text-sm px-3 py-1 rounded border bg-white hover:bg-slate-50"
+                onClick={() => fetchComplaints()}
+              >
+                Apply
+              </button>
+            </div>
             
             {complaints.length === 0 ? (
               <p className="text-gray-500">No complaints found.</p>
@@ -276,17 +380,14 @@ export default function SupervisorDashboard() {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {complaints.map((complaint) => (
                       <tr key={complaint.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {complaint.id}
-                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{complaint.id}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {complaint.tenant_name || complaint.tenant_email}
                         </td>
@@ -315,7 +416,32 @@ export default function SupervisorDashboard() {
                             {complaint.status.replace('_', ' ')}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button
+                            title="Click to change priority"
+                            className={priorityBtnClass(((complaint.priority ?? 'medium') as Priority))}
+                            onClick={async () => {
+                              const current = (complaint.priority ?? 'medium') as Priority
+                              const next = nextPriority(current)
+                              const prevP = complaint.priority
+                              // optimistic UI
+                              setComplaints(prev => prev.map(c => c.id === complaint.id ? { ...c, priority: next } : c))
+                              const res = await fetch(`/api/complaints/${complaint.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ priority: next })
+                              })
+                              if (!res.ok) {
+                                // rollback on failure
+                                setComplaints(prev => prev.map(c => c.id === complaint.id ? { ...c, priority: prevP } : c))
+                                alert('Failed to update priority')
+                              }
+                            }}
+                          >
+                            {(complaint.priority ?? 'medium')}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
                           <button onClick={() => handleViewComplaint(complaint)} className="text-indigo-600 hover:text-indigo-900">View</button>
                         </td>
                       </tr>
@@ -454,6 +580,88 @@ export default function SupervisorDashboard() {
                       )}
                     </div>
                     <div className="flex flex-col gap-2">
+                      <div className="border rounded p-2">
+                        <p className="text-xs font-medium text-gray-600 mb-1">Suggested time (optional)</p>
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] text-gray-600">
+                            Start
+                            <input
+                              type="datetime-local"
+                              value={scheduledStart}
+                              onChange={(e) => setScheduledStart(e.target.value)}
+                              className="mt-0.5 block w-full border rounded px-2 py-1 text-xs"
+                            />
+                          </label>
+                          <label className="text-[11px] text-gray-600">
+                            End
+                            <input
+                              type="datetime-local"
+                              value={scheduledEnd}
+                              onChange={(e) => setScheduledEnd(e.target.value)}
+                              className="mt-0.5 block w-full border rounded px-2 py-1 text-xs"
+                            />
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={checkAvailability}
+                              className="px-2 py-1 text-xs rounded border bg-white text-gray-700 hover:bg-gray-50"
+                              disabled={!scheduledStart || selectedWorkers.length === 0 || availabilityLoading}
+                            >
+                              {availabilityLoading ? 'Checking…' : 'Check availability'}
+                            </button>
+                            {(scheduledStart || scheduledEnd) && (
+                              <button
+                                type="button"
+                                onClick={() => { setScheduledStart(''); setScheduledEnd(''); }}
+                                className="px-2 py-1 text-xs rounded border bg-white text-gray-700 hover:bg-gray-50"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          {(availabilityError || availabilityBusy.length > 0) && (
+                            <div className="mt-1 text-[11px]">
+                              {availabilityError && (
+                                <div className="text-red-600">{availabilityError}</div>
+                              )}
+                              {availabilityBusy.length > 0 && (
+                                <div className="mt-1 border rounded p-1.5 bg-slate-50">
+                                  <p className="font-semibold text-gray-700 mb-1">Busy windows on {scheduledStart.slice(0,10)}</p>
+                                  <ul className="space-y-1 max-h-28 overflow-auto">
+                                    {(() => {
+                                      const byWorker = new Map<string, Array<typeof availabilityBusy[number]>>()
+                                      for (const b of availabilityBusy) {
+                                        const arr = byWorker.get(b.worker_id) ?? []
+                                        arr.push(b)
+                                        byWorker.set(b.worker_id, arr)
+                                      }
+                                      const items: React.ReactNode[] = []
+                                      for (const [wid, arr] of byWorker.entries()) {
+                                        const worker = workers.find(w => w.id === wid)
+                                        items.push(
+                                          <li key={wid} className="border rounded p-1 bg-white">
+                                            <div className="text-gray-800">{worker?.name || worker?.email || wid}</div>
+                                            <ul className="list-disc ml-4 text-gray-700">
+                                              {arr.sort((a,b)=>a.start_at.localeCompare(b.start_at)).map((b, idx) => (
+                                                <li key={idx}>
+                                                  <span className="uppercase text-[10px] mr-1 text-slate-500">{b.source}</span>
+                                                  {formatLocal(b.start_at)} → {formatLocal(b.end_at)}
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </li>
+                                        )
+                                      }
+                                      return items
+                                    })()}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       <button
                         onClick={handleAssign}
                         disabled={assigning || selectedWorkers.length === 0}
@@ -534,6 +742,11 @@ export default function SupervisorDashboard() {
                               Remove
                             </label>
                           </div>
+                          {(a.scheduled_start || a.scheduled_end) && (
+                            <div className="mt-1 text-xs text-gray-600">
+                              <span className="font-medium">Scheduled:</span> {formatLocal(a.scheduled_start)} → {formatLocal(a.scheduled_end)}
+                            </div>
+                          )}
                           {a.is_leader && (
                             <>
                               {a.detail ? (

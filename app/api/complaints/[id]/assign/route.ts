@@ -19,9 +19,11 @@ export async function POST(
   const complaintId = Number(id)
   if (Number.isNaN(complaintId)) return NextResponse.json({ error: 'Invalid complaint id' }, { status: 400 })
 
-  const body = (await request.json().catch(() => null)) as { worker_ids?: string[]; leader_id?: string | null } | null
+  const body = (await request.json().catch(() => null)) as { worker_ids?: string[]; leader_id?: string | null; scheduled_start?: string | null; scheduled_end?: string | null } | null
   const workerIds = body?.worker_ids ?? []
   const leaderId = body?.leader_id || null
+  const scheduledStart = body?.scheduled_start ?? null
+  const scheduledEnd = body?.scheduled_end ?? null
   if (!Array.isArray(workerIds) || workerIds.length === 0) {
     return NextResponse.json({ error: 'worker_ids is required' }, { status: 400 })
   }
@@ -50,7 +52,14 @@ export async function POST(
   // Effective leader for this batch: only when there is no existing leader and the provided leader is among worker_ids
   const effectiveLeaderId = !existingLeaderRow && leaderId && workerIds.includes(leaderId) ? leaderId : null
 
-  const rows = workerIds.map((wid) => ({ complaint_id: complaintId, worker_id: wid, assigned_by: user.id, is_leader: wid === effectiveLeaderId }))
+  const rows = workerIds.map((wid) => ({
+    complaint_id: complaintId,
+    worker_id: wid,
+    assigned_by: user.id,
+    is_leader: wid === effectiveLeaderId,
+    scheduled_start: scheduledStart,
+    scheduled_end: scheduledEnd,
+  }))
   const { data, error } = await supabase.from('complaint_assignments').insert(rows).select('id, worker_id, status, is_leader, created_at, updated_at')
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json(data)

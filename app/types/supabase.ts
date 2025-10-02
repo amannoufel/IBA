@@ -58,6 +58,7 @@ export type Database = {
           type_id: number
           description: string
           status: string
+          priority: 'low' | 'medium' | 'high'
           image_path: string | null
           created_at: string
           updated_at: string
@@ -67,6 +68,7 @@ export type Database = {
           type_id: number
           description: string
           status?: string
+          priority?: 'low' | 'medium' | 'high'
           image_path?: string | null
           created_at?: string
           updated_at?: string
@@ -76,6 +78,7 @@ export type Database = {
           type_id?: number
           description?: string
           status?: string
+          priority?: 'low' | 'medium' | 'high'
           image_path?: string | null
           created_at?: string
           updated_at?: string
@@ -89,6 +92,8 @@ export type Database = {
           status: string
           assigned_by: string | null
           is_leader: boolean | null
+          scheduled_start: string | null
+          scheduled_end: string | null
           created_at: string
           updated_at: string
         }
@@ -98,6 +103,8 @@ export type Database = {
           status?: string
           assigned_by?: string | null
           is_leader?: boolean | null
+          scheduled_start?: string | null
+          scheduled_end?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -107,6 +114,8 @@ export type Database = {
           status?: string
           assigned_by?: string | null
           is_leader?: boolean | null
+          scheduled_start?: string | null
+          scheduled_end?: string | null
           created_at?: string
           updated_at?: string
         }

@@ -23,19 +23,39 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { status } = await request.json()
-    
-    if (!['pending', 'attended', 'completed'].includes(status)) {
-      return NextResponse.json(
-        { error: 'Invalid status. Must be "pending", "attended", or "completed"' }, 
-        { status: 400 }
-      )
+    const body = await request.json().catch(() => ({} as Record<string, unknown>))
+    const updates: { status?: string; priority?: 'low' | 'medium' | 'high' } = {}
+
+    if (typeof body.status === 'string') {
+      const s = body.status.toLowerCase()
+      if (!['pending', 'attended', 'completed'].includes(s)) {
+        return NextResponse.json(
+          { error: 'Invalid status. Must be "pending", "attended", or "completed"' },
+          { status: 400 }
+        )
+      }
+      updates.status = s
     }
 
-    // Update the complaint status
+    if (typeof body.priority === 'string') {
+      const p = body.priority.toLowerCase()
+      if (p !== 'low' && p !== 'medium' && p !== 'high') {
+        return NextResponse.json(
+          { error: 'Invalid priority. Must be "low", "medium", or "high"' },
+          { status: 400 }
+        )
+      }
+      updates.priority = p as 'low' | 'medium' | 'high'
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    }
+
+    // Update the complaint fields
     const { error } = await supabase
       .from('complaints')
-      .update({ status })
+      .update(updates)
       .eq('id', id)
 
     if (error) {

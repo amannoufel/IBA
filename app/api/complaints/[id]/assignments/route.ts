@@ -25,6 +25,7 @@ export async function GET(
     .from('complaint_assignments')
     .select(`
       id, worker_id, status, created_at, updated_at, is_leader,
+      scheduled_start, scheduled_end,
       profiles:worker_id (email, name)
     `)
     .eq('complaint_id', complaintId)
@@ -38,6 +39,8 @@ export async function GET(
     created_at: string
     updated_at: string
     is_leader?: boolean | null
+    scheduled_start?: string | null
+    scheduled_end?: string | null
     profiles?: { email?: string | null; name?: string | null } | null
   }>
 
@@ -113,6 +116,8 @@ export async function GET(
       status: row.status,
       created_at: row.created_at,
       updated_at: row.updated_at,
+      scheduled_start: row.scheduled_start ?? null,
+      scheduled_end: row.scheduled_end ?? null,
       profiles: row.profiles ?? null,
       is_leader: !!row.is_leader,
       detail: {

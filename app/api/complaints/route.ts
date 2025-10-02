@@ -16,9 +16,11 @@ export async function POST(request: Request) {
 
     // Try to detect multipart form
     const contentType = request.headers.get('content-type') || ''
-    let type_id: number
+  let type_id: number
     let description: string
     let imagePath: string | null = null
+  // Priority is supervisor-controlled; default to 'medium' here and ignore client input
+  const priority: 'low' | 'medium' | 'high' = 'medium'
 
     if (contentType.includes('multipart/form-data')) {
       const form = await request.formData()
@@ -26,7 +28,9 @@ export async function POST(request: Request) {
       type_id = Number(typeStr)
       description = form.get('description')?.toString() || ''
 
-      const file = form.get('image') as File | null
+  // Ignore any priority passed from tenant forms
+
+  const file = form.get('image') as File | null
       if (file && file.size > 0) {
         // Validate file type and size (<= 5MB and image/*)
         const maxBytes = 5 * 1024 * 1024
@@ -60,6 +64,7 @@ export async function POST(request: Request) {
       const body = await request.json()
       type_id = Number(body.type_id)
       description = String(body.description || '')
+      // Ignore any priority passed from JSON body
     }
 
     if (!type_id || !description) {
@@ -76,6 +81,7 @@ export async function POST(request: Request) {
           description,
           status: 'pending',
           image_path: imagePath,
+          priority,
         }
       ])
       .select()

@@ -16,6 +16,7 @@ export default function TenantDashboard() {
   const [description, setDescription] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  // Priority is supervisor-only; tenants don't set it
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [myComplaints, setMyComplaints] = useState<Array<{
@@ -107,6 +108,7 @@ export default function TenantDashboard() {
       const formData = new FormData()
       formData.append('type_id', String(selectedType))
       formData.append('description', description)
+  // Do not send priority from tenant UI; supervisors set it
       if (imageFile) {
         formData.append('image', imageFile)
       }
@@ -187,6 +189,8 @@ export default function TenantDashboard() {
                   ))}
                 </select>
               </div>
+
+              {/* Priority removed from tenant form. Supervisors will set it from their dashboard. */}
 
               <div>
                 <label htmlFor="description" className="block text-sm font-medium text-gray-700">

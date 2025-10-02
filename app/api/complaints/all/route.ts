@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { Database } from '../../../types/supabase'
 
-export async function GET() {
+export async function GET(request: Request) {
   const cookieStore = await cookies()
   const supabase = createRouteHandlerClient<Database>({
     cookies: (() => cookieStore) as unknown as typeof cookies,
@@ -42,8 +42,11 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden: Not a supervisor' }, { status: 403 })
     }
 
-    // Fetch complaints; RLS should now allow due to supervisor policies
-    const { data: complaints, error: complaintsError } = await supabase
+    // Parse optional filter params
+    const url = new URL(request.url)
+    const priorityFilter = url.searchParams.get('priority')?.toLowerCase()
+
+    let query = supabase
       .from('complaints')
       .select(`
         id, 
@@ -51,10 +54,18 @@ export async function GET() {
         description, 
         status, 
         image_path,
+        priority,
         created_at,
         tenant_id
       `)
       .order('created_at', { ascending: false })
+
+    if (priorityFilter === 'low' || priorityFilter === 'medium' || priorityFilter === 'high') {
+      query = query.eq('priority', priorityFilter)
+    }
+
+    // Fetch complaints; RLS should now allow due to supervisor policies
+    const { data: complaints, error: complaintsError } = await query
 
     if (complaintsError) {
       console.error('Complaints fetch error:', complaintsError)
@@ -119,6 +130,7 @@ export async function GET() {
       type_id: number
       description: string
       status: string
+      priority: 'low' | 'medium' | 'high'
       image_path?: string | null
       created_at: string
       tenant_id: string
@@ -143,6 +155,7 @@ export async function GET() {
         category: complaintType?.name || 'Unknown',
         description: c.description,
         status: c.status,
+        priority: c.priority,
         image_path: c.image_path,
         image_url,
         created_at: c.created_at,
