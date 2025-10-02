@@ -670,8 +670,8 @@ export default function SupervisorDashboard() {
                             )}
                           </div>
                           {conflictWorkers.length > 0 && (
-                            <div className="mt-1 text-[11px] text-red-600 border border-red-200 bg-red-50 rounded p-1.5">
-                              Conflicts with: {conflictWorkers.map(wid => (workers.find(w => w.id === wid)?.name || workers.find(w => w.id === wid)?.email || wid)).join(', ')}
+                            <div className="mt-1 text-[11px] text-amber-700 border border-amber-200 bg-amber-50 rounded p-1.5">
+                              Conflicts with: {conflictWorkers.map(wid => (workers.find(w => w.id === wid)?.name || workers.find(w => w.id === wid)?.email || wid)).join(', ')}. You can still assign; this is advisory only.
                             </div>
                           )}
                           {(availabilityError || availabilityBusy.length > 0) && (
@@ -718,9 +718,9 @@ export default function SupervisorDashboard() {
                       </div>
                       <button
                         onClick={handleAssign}
-                        disabled={assigning || selectedWorkers.length === 0 || conflictWorkers.length > 0}
-                        title={conflictWorkers.length > 0 ? 'Resolve conflicts or adjust time window before assigning' : undefined}
-                        className={`px-3 py-1 text-xs font-medium rounded ${conflictWorkers.length > 0 ? 'bg-indigo-300 cursor-not-allowed text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'} ${assigning ? 'opacity-50' : ''}`}
+                        disabled={assigning || selectedWorkers.length === 0}
+                        title={conflictWorkers.length > 0 ? 'Conflicts detected; assignment will proceed anyway' : undefined}
+                        className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${assigning ? 'opacity-50' : 'hover:bg-indigo-700'}`}
                       >
                         {assigning ? 'Assigning…' : 'Assign'}
                       </button>
