@@ -59,6 +59,7 @@ export default function SupervisorDashboard() {
   const [availabilityBusy, setAvailabilityBusy] = useState<Array<{ worker_id: string; source: string; start_at: string; end_at: string; complaint_id: number | null; assignment_id: number | null }>>([])
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
   const [availabilityError, setAvailabilityError] = useState<string | null>(null)
+  const [conflictWorkers, setConflictWorkers] = useState<string[]>([])
   const router = useRouter()
   const supabase = useSupabase()
   type Priority = 'low' | 'medium' | 'high'
@@ -218,6 +219,16 @@ export default function SupervisorDashboard() {
       setAvailabilityError('Please pick a start time first.')
       return
     }
+    if (scheduledEnd) {
+      try {
+        const s = new Date(scheduledStart)
+        const e = new Date(scheduledEnd)
+        if (e < s) {
+          setAvailabilityError('End time must be after start time.')
+          return
+        }
+      } catch {}
+    }
     if (selectedWorkers.length === 0) {
       setAvailabilityError('Select at least one worker to check availability.')
       return
@@ -226,9 +237,32 @@ export default function SupervisorDashboard() {
     try {
       setAvailabilityLoading(true)
       const res = await fetch(`/api/workers/availability?day=${encodeURIComponent(day)}&workerIds=${encodeURIComponent(selectedWorkers.join(','))}`)
-      const dj = await res.json().catch(() => ({})) as { busy?: Array<{ worker_id: string; source: string; start_at: string; end_at: string; complaint_id: number | null; assignment_id: number | null }>; error?: string }
+      const dj = await res.json().catch(() => ({})) as { busy?: Array<{ worker_id: string; source: string; start_at: string; end_at: string; complaint_id: number | null; assignment_id: number | null }>; error?: string; warning?: string }
       if (!res.ok) throw new Error(dj?.error || 'Failed to fetch availability')
-      setAvailabilityBusy(dj.busy ?? [])
+      const busy = dj.busy ?? []
+      setAvailabilityBusy(busy)
+      if (dj.warning === 'availability_unavailable') {
+        setAvailabilityError('Availability data is temporarily unavailable. You can still assign; this is advisory only.')
+      }
+      // Compute conflicts against proposed window (use 1h default if end not provided) considering only scheduled windows
+      try {
+        const s = scheduledStart ? new Date(scheduledStart) : null
+        const e = scheduledEnd ? new Date(scheduledEnd) : (s ? new Date(s.getTime() + 60 * 60 * 1000) : null)
+        if (s && e) {
+          const sMs = s.getTime(); const eMs = e.getTime()
+          const overlaps = (a1: number, a2: number, b1: number, b2: number) => a1 < b2 && a2 > b1
+          const conflicting = new Set<string>()
+          for (const b of busy) {
+            if (b.source?.toLowerCase() !== 'scheduled') continue
+            const bs = new Date(b.start_at).getTime()
+            const be = new Date(b.end_at).getTime()
+            if (overlaps(sMs, eMs, bs, be)) conflicting.add(b.worker_id)
+          }
+          setConflictWorkers(Array.from(conflicting))
+        } else {
+          setConflictWorkers([])
+        }
+      } catch { setConflictWorkers([]) }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to fetch availability'
       setAvailabilityError(msg)
@@ -241,6 +275,7 @@ export default function SupervisorDashboard() {
   useEffect(() => {
     setAvailabilityBusy([])
     setAvailabilityError(null)
+    setConflictWorkers([])
   }, [scheduledStart, scheduledEnd, selectedWorkers.join(',')])
 
   const handleAssign = async () => {
@@ -249,6 +284,17 @@ export default function SupervisorDashboard() {
     if (assignments.length === 0 && (!leaderSelection || !selectedWorkers.includes(leaderSelection))) {
       alert('Please select a leader from the chosen workers before assigning.')
       return
+    }
+    // Validate schedule ordering if both provided
+    if (scheduledStart && scheduledEnd) {
+      try {
+        const s = new Date(scheduledStart)
+        const e = new Date(scheduledEnd)
+        if (e < s) {
+          alert('End time must be after start time.')
+          return
+        }
+      } catch {}
     }
     try {
       setAssigning(true)
@@ -620,6 +666,11 @@ export default function SupervisorDashboard() {
                               </button>
                             )}
                           </div>
+                          {conflictWorkers.length > 0 && (
+                            <div className="mt-1 text-[11px] text-red-600 border border-red-200 bg-red-50 rounded p-1.5">
+                              Conflicts with: {conflictWorkers.map(wid => (workers.find(w => w.id === wid)?.name || workers.find(w => w.id === wid)?.email || wid)).join(', ')}
+                            </div>
+                          )}
                           {(availabilityError || availabilityBusy.length > 0) && (
                             <div className="mt-1 text-[11px]">
                               {availabilityError && (
@@ -664,8 +715,9 @@ export default function SupervisorDashboard() {
                       </div>
                       <button
                         onClick={handleAssign}
-                        disabled={assigning || selectedWorkers.length === 0}
-                        className={`px-3 py-1 text-xs font-medium rounded bg-indigo-600 text-white ${assigning ? 'opacity-50' : 'hover:bg-indigo-700'}`}
+                        disabled={assigning || selectedWorkers.length === 0 || conflictWorkers.length > 0}
+                        title={conflictWorkers.length > 0 ? 'Resolve conflicts or adjust time window before assigning' : undefined}
+                        className={`px-3 py-1 text-xs font-medium rounded ${conflictWorkers.length > 0 ? 'bg-indigo-300 cursor-not-allowed text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'} ${assigning ? 'opacity-50' : ''}`}
                       >
                         {assigning ? 'Assigning…' : 'Assign'}
                       </button>

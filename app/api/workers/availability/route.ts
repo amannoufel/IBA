@@ -29,7 +29,14 @@ export async function GET(request: Request) {
       _day: day,
     } as unknown as { _worker_ids: string[]; _day: string })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('range lower bound must be less than or equal to range upper bound')) {
+        // Non-blocking advisory endpoint: fail soft and return empty availability
+        return NextResponse.json({ busy: [], warning: 'availability_unavailable' })
+      }
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
 
     return NextResponse.json({ busy: data ?? [] })
   } catch (e) {
