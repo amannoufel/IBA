@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSupabase } from '../lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -72,6 +72,23 @@ export default function SupervisorDashboard() {
       : 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-100 transition'
   )
 
+  const fetchComplaints = useCallback(async () => {
+    try {
+      setLoading(true)
+      const qs = priorityFilter === 'all' ? '' : `?priority=${priorityFilter}`
+      const response = await fetch(`/api/complaints/all${qs}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch complaints')
+      }
+      const data = await response.json()
+      setComplaints(data)
+    } catch (error) {
+      console.error('Error fetching complaints:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [priorityFilter])
+
   useEffect(() => {
     const checkUser = async () => {
       try {
@@ -92,7 +109,7 @@ export default function SupervisorDashboard() {
     }
     
     checkUser()
-  }, [router, supabase])
+  }, [router, supabase, fetchComplaints])
 
   const fetchWorkers = async () => {
     try {
@@ -106,22 +123,7 @@ export default function SupervisorDashboard() {
     }
   }
 
-  const fetchComplaints = async () => {
-    try {
-      setLoading(true)
-      const qs = priorityFilter === 'all' ? '' : `?priority=${priorityFilter}`
-      const response = await fetch(`/api/complaints/all${qs}`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch complaints')
-      }
-      const data = await response.json()
-      setComplaints(data)
-    } catch (error) {
-      console.error('Error fetching complaints:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // no-op: fetchComplaints defined with useCallback above
 
   const handleViewComplaint = (complaint: Complaint) => {
     setSelectedComplaint(complaint)
@@ -272,11 +274,12 @@ export default function SupervisorDashboard() {
   }
 
   // Clear availability preview when schedule or selection changes
+  const selectedWorkersKey = useMemo(() => selectedWorkers.join(','), [selectedWorkers])
   useEffect(() => {
     setAvailabilityBusy([])
     setAvailabilityError(null)
     setConflictWorkers([])
-  }, [scheduledStart, scheduledEnd, selectedWorkers.join(',')])
+  }, [scheduledStart, scheduledEnd, selectedWorkersKey])
 
   const handleAssign = async () => {
     if (!selectedComplaint || selectedWorkers.length === 0) return

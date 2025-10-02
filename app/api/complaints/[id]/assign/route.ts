@@ -22,8 +22,8 @@ export async function POST(
   const body = (await request.json().catch(() => null)) as { worker_ids?: string[]; leader_id?: string | null; scheduled_start?: string | null; scheduled_end?: string | null } | null
   const workerIds = body?.worker_ids ?? []
   const leaderId = body?.leader_id || null
-  let scheduledStart = body?.scheduled_start ?? null
-  let scheduledEnd = body?.scheduled_end ?? null
+  const scheduledStart = body?.scheduled_start ?? null
+  const scheduledEnd = body?.scheduled_end ?? null
   // Normalize schedule: if both provided and end < start, reject
   if (scheduledStart && scheduledEnd) {
     try {

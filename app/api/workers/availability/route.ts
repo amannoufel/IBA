@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ busy: data ?? [] })
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
