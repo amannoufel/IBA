@@ -72,7 +72,10 @@ export default function ReportsPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-4">Worker Reports</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-semibold">Worker Reports</h1>
+        <a href="/supervisor/reports/complaints" className="text-sm text-indigo-600 hover:underline">Complaint Reports</a>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
         <div>
           <label className="text-sm text-slate-600">Start</label>
