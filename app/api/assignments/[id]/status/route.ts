@@ -30,14 +30,20 @@ export async function PATCH(
   // Load assignment to validate transitions and ownership
   const { data: assignment, error: aErr } = await supabase
     .from('complaint_assignments')
-    .select('id, worker_id, status')
+    .select('id, worker_id, status, complaint_id')
     .eq('id', assignmentId)
     .single()
   if (aErr || !assignment) return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
 
-  // Worker-side transitions
+  // Worker-side only actions
   if (action === 'start' || action === 'mark_done') {
-    if (assignment.worker_id !== user.id) {
+    if (assignment.worker_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Supervisor-only actions
+  if (action === 'approve' || action === 'reopen') {
+    const { data: su } = await supabase.auth.getUser()
+    if (!su?.user || su.user.user_metadata?.role?.toLowerCase() !== 'supervisor') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
   }
@@ -127,7 +133,34 @@ export async function PATCH(
           if (insErr) return NextResponse.json({ error: `Failed to save sessions: ${insErr.message}` }, { status: 400 })
         }
       }
+
+      // Set all team assignments to pending_review together (leader + teammates)
+      await supabase
+        .from('complaint_assignments')
+        .update({ status: 'pending_review' })
+        .eq('complaint_id', thisAssign.complaint_id!)
+      return NextResponse.json({ ok: true, status: 'pending_review' })
     }
+  }
+
+  if (action === 'reopen') {
+    // Set the whole team back to in_progress for this complaint
+    const { error: upErr } = await supabase
+      .from('complaint_assignments')
+      .update({ status: 'in_progress' })
+      .eq('complaint_id', assignment.complaint_id as number)
+    if (upErr) return NextResponse.json({ error: upErr.message || 'Update failed' }, { status: 400 })
+    return NextResponse.json({ ok: true, status: 'in_progress' })
+  }
+
+  if (action === 'approve') {
+    // Mark the entire team completed once supervisor approves
+    const { error: upErr } = await supabase
+      .from('complaint_assignments')
+      .update({ status: 'completed' })
+      .eq('complaint_id', assignment.complaint_id as number)
+    if (upErr) return NextResponse.json({ error: upErr.message || 'Update failed' }, { status: 400 })
+    return NextResponse.json({ ok: true, status: 'completed' })
   }
 
   const { error: uErr } = await supabase

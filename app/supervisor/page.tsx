@@ -456,9 +456,9 @@ export default function SupervisorDashboard() {
                           <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border ${
                             complaint.status === 'pending'
                               ? 'bg-yellow-50 text-yellow-800 border-yellow-200'
-                              : complaint.status === 'in_progress' || complaint.status === 'attended'
+                              : complaint.status === 'in_progress'
                               ? 'bg-blue-50 text-blue-800 border-blue-200'
-                              : complaint.status === 'completed' || complaint.status === 'resolved'
+                              : complaint.status === 'completed'
                               ? 'bg-green-50 text-green-800 border-green-200'
                               : 'bg-slate-100 text-slate-700 border-slate-200'
                           }`}>
@@ -787,7 +787,7 @@ export default function SupervisorDashboard() {
                             {a.is_leader && leaderEdit !== a.worker_id && (
                               <span className="text-[10px] text-gray-500">(current)</span>
                             )}
-                            <span className="text-xs italic">{a.status.replace('_',' ')}</span>
+                            <span className="text-xs italic">{a.status === 'pending_review' ? 'waiting for review' : a.status.replace('_',' ')}</span>
                             <label className="ml-auto flex items-center gap-1 text-[11px] text-red-600">
                               <input
                                 type="checkbox"
@@ -896,39 +896,7 @@ export default function SupervisorDashboard() {
                   </div>
                 )}
 
-                <p className="text-sm font-medium text-gray-500 mb-2">Update Status</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleStatusUpdate(selectedComplaint.id, 'pending')}
-                    className={`px-3 py-1 text-xs font-medium rounded ${
-                      selectedComplaint.status === 'pending' 
-                        ? 'bg-yellow-200 text-yellow-800' 
-                        : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                    }`}
-                  >
-                    Pending
-                  </button>
-                  <button
-                    onClick={() => handleStatusUpdate(selectedComplaint.id, 'attended')}
-                    className={`px-3 py-1 text-xs font-medium rounded ${
-                      selectedComplaint.status === 'attended' 
-                        ? 'bg-blue-200 text-blue-800' 
-                        : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                    }`}
-                  >
-                    Attended
-                  </button>
-                  <button
-                    onClick={() => handleStatusUpdate(selectedComplaint.id, 'completed')}
-                    className={`px-3 py-1 text-xs font-medium rounded ${
-                      selectedComplaint.status === 'completed' 
-                        ? 'bg-green-200 text-green-800' 
-                        : 'bg-green-100 text-green-800 hover:bg-green-200'
-                    }`}
-                  >
-                    Completed
-                  </button>
-                </div>
+                {/* Complaint status is derived from assignments; supervisor changes happen via Approve/Reopen on leader row. */}
               </div>
             </div>
           </div>

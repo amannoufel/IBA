@@ -27,14 +27,7 @@ export async function PATCH(
     const updates: { status?: string; priority?: 'low' | 'medium' | 'high' } = {}
 
     if (typeof body.status === 'string') {
-      const s = body.status.toLowerCase()
-      if (!['pending', 'attended', 'completed'].includes(s)) {
-        return NextResponse.json(
-          { error: 'Invalid status. Must be "pending", "attended", or "completed"' },
-          { status: 400 }
-        )
-      }
-      updates.status = s
+      return NextResponse.json({ error: 'Complaint status is derived from assignments. Approve or reopen assignments to change overall status.' }, { status: 400 })
     }
 
     if (typeof body.priority === 'string') {
