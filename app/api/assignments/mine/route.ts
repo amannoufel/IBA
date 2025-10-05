@@ -14,7 +14,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('complaint_assignments')
-    .select('id, status, created_at, updated_at, is_leader, complaint:complaint_id (id, description, status, created_at)')
+    .select('id, status, created_at, updated_at, is_leader, scheduled_start, scheduled_end, complaint:complaint_id (id, description, status, created_at)')
     .eq('worker_id', user.id)
     .order('created_at', { ascending: false })
 

@@ -32,6 +32,13 @@ export default function SupervisorDashboard() {
   const [removeAssignmentIds, setRemoveAssignmentIds] = useState<number[]>([])
   const [leaderEdit, setLeaderEdit] = useState<string | null>(null)
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [fromDate, setFromDate] = useState<string>('')
+  const [toDate, setToDate] = useState<string>('')
+  const [areaFilter, setAreaFilter] = useState<string>('')
+  const [buildingFilter, setBuildingFilter] = useState<string>('')
+  const [categoryFilter, setCategoryFilter] = useState<string>('')
+  const [searchTerm, setSearchTerm] = useState<string>('')
   const [assignments, setAssignments] = useState<Array<{
     id: number;
     worker_id: string;
@@ -75,7 +82,21 @@ export default function SupervisorDashboard() {
   const fetchComplaints = useCallback(async () => {
     try {
       setLoading(true)
-      const qs = priorityFilter === 'all' ? '' : `?priority=${priorityFilter}`
+      const params = new URLSearchParams()
+      if (priorityFilter !== 'all') params.set('priority', priorityFilter)
+      if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
+      if (fromDate) params.set('from', new Date(fromDate).toISOString())
+      if (toDate) {
+        // include entire day by advancing to end of day if only date provided
+        const dt = new Date(toDate)
+        dt.setHours(23,59,59,999)
+        params.set('to', dt.toISOString())
+      }
+      if (areaFilter) params.set('area', areaFilter)
+      if (buildingFilter) params.set('building', buildingFilter)
+      if (categoryFilter) params.set('category', categoryFilter)
+      if (searchTerm.trim()) params.set('search', searchTerm.trim())
+      const qs = params.toString() ? `?${params.toString()}` : ''
       const response = await fetch(`/api/complaints/all${qs}`)
       if (!response.ok) {
         throw new Error('Failed to fetch complaints')
@@ -87,7 +108,7 @@ export default function SupervisorDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [priorityFilter])
+  }, [priorityFilter, statusFilter, fromDate, toDate, areaFilter, buildingFilter, categoryFilter, searchTerm])
 
   useEffect(() => {
     const checkUser = async () => {
@@ -381,24 +402,117 @@ export default function SupervisorDashboard() {
         <div className="px-4 py-6 sm:px-0">
           <div className="rounded-xl border border-slate-200 bg-white/80 shadow-sm p-4 overflow-auto">
             <h2 className="text-lg font-medium mb-4">All Tenant Complaints</h2>
-            <div className="flex items-center gap-2 mb-3">
-              <label className="text-sm text-slate-600">Priority:</label>
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value as 'all' | 'low' | 'medium' | 'high')}
-                className="border rounded px-2 py-1 text-sm"
-              >
-                <option value="all">All</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-              <button
-                className="ml-2 text-sm px-3 py-1 rounded border bg-white hover:bg-slate-50"
-                onClick={() => fetchComplaints()}
-              >
-                Apply
-              </button>
+            <div className="space-y-3 mb-4">
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex flex-col">
+                  <label className="text-[11px] uppercase tracking-wide text-slate-500">Priority</label>
+                  <select
+                    value={priorityFilter}
+                    onChange={(e) => setPriorityFilter(e.target.value as 'all' | 'low' | 'medium' | 'high')}
+                    className="border rounded px-2 py-1 text-sm"
+                  >
+                    <option value="all">All</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-[11px] uppercase tracking-wide text-slate-500">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="border rounded px-2 py-1 text-sm"
+                  >
+                    <option value="all">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="pending_review">Waiting Review</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-[11px] uppercase tracking-wide text-slate-500">From</label>
+                  <input type="date" value={fromDate} onChange={(e)=>setFromDate(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-[11px] uppercase tracking-wide text-slate-500">To</label>
+                  <input type="date" value={toDate} onChange={(e)=>setToDate(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-[11px] uppercase tracking-wide text-slate-500">Area</label>
+                  <select value={areaFilter} onChange={(e)=>{ setAreaFilter(e.target.value); setBuildingFilter('') }} className="border rounded px-2 py-1 text-sm">
+                    <option value="">All</option>
+                    <option value="garrafa">Garrafa</option>
+                    <option value="al hilal">Al Hilal</option>
+                    <option value="lusail">Lusail</option>
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-[11px] uppercase tracking-wide text-slate-500">Building</label>
+                  <select value={buildingFilter} onChange={(e)=>setBuildingFilter(e.target.value)} className="border rounded px-2 py-1 text-sm" disabled={!areaFilter}>
+                    <option value="">{areaFilter ? 'All' : 'Select area'}</option>
+                    {areaFilter === 'lusail' && ['Lusail Tower 1','Lusail Tower 2'].map(b => <option key={b.toLowerCase()} value={b.toLowerCase()}>{b}</option>)}
+                    {areaFilter === 'garrafa' && ['Garrafa Garden 1','Garrafa Garden 2'].map(b => <option key={b.toLowerCase()} value={b.toLowerCase()}>{b}</option>)}
+                    {areaFilter === 'al hilal' && ['Hilal Hills 1','Hilal Hills 2'].map(b => <option key={b.toLowerCase()} value={b.toLowerCase()}>{b}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-[11px] uppercase tracking-wide text-slate-500">Category</label>
+                  <input
+                    type="text"
+                    value={categoryFilter}
+                    onChange={(e)=>setCategoryFilter(e.target.value)}
+                    placeholder="e.g. Plumbing"
+                    className="border rounded px-2 py-1 text-sm w-36"
+                  />
+                </div>
+                <div className="flex flex-col flex-1 min-w-[180px]">
+                  <label className="text-[11px] uppercase tracking-wide text-slate-500">Search</label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e)=>setSearchTerm(e.target.value)}
+                    placeholder="Text search..."
+                    className="border rounded px-2 py-1 text-sm"
+                  />
+                </div>
+                <div className="flex gap-2 pb-1">
+                  <button
+                    className="text-sm px-3 py-1 rounded border bg-white hover:bg-slate-50"
+                    onClick={() => fetchComplaints()}
+                    type="button"
+                  >Apply</button>
+                  <button
+                    type="button"
+                    className="text-sm px-3 py-1 rounded border bg-white hover:bg-slate-50"
+                    onClick={() => { setPriorityFilter('all'); setStatusFilter('all'); setFromDate(''); setToDate(''); setAreaFilter(''); setBuildingFilter(''); setCategoryFilter(''); setSearchTerm(''); }}
+                  >Reset</button>
+                </div>
+              </div>
+              {/* Active filter chips */}
+              <div className="flex flex-wrap gap-2 text-xs">
+                {[{k:'Priority',v:priorityFilter!=='all'?priorityFilter:''},{k:'Status',v:statusFilter!=='all'?statusFilter:''},{k:'Area',v:areaFilter},{k:'Building',v:buildingFilter},{k:'Category',v:categoryFilter},{k:'From',v:fromDate},{k:'To',v:toDate},{k:'Search',v:searchTerm.trim()}]
+                  .filter(f=>f.v).map(f => (
+                  <span key={f.k} className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
+                    {f.k}: {f.v}
+                    <button
+                      type="button"
+                      className="text-indigo-500 hover:text-indigo-700"
+                      onClick={() => {
+                        if (f.k==='Priority') setPriorityFilter('all')
+                        if (f.k==='Status') setStatusFilter('all')
+                        if (f.k==='Area') { setAreaFilter(''); setBuildingFilter('') }
+                        if (f.k==='Building') setBuildingFilter('')
+                        if (f.k==='Category') setCategoryFilter('')
+                        if (f.k==='From') setFromDate('')
+                        if (f.k==='To') setToDate('')
+                        if (f.k==='Search') setSearchTerm('')
+                      }}
+                    >×</button>
+                  </span>
+                ))}
+              </div>
             </div>
             
             {complaints.length === 0 ? (

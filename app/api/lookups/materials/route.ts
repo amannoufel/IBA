@@ -12,7 +12,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('materials')
-    .select('id, name')
+    .select('id, name, code')
     .eq('active', true)
     .order('name')
 

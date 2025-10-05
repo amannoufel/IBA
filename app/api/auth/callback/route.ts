@@ -62,6 +62,9 @@ export async function GET(request: Request) {
       if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'room_number')) {
         payload.room_number = (user.user_metadata as Record<string, unknown>).room_number as string | null
       }
+      if (Object.prototype.hasOwnProperty.call(user.user_metadata ?? {}, 'area')) {
+        payload.area = (user.user_metadata as Record<string, unknown>).area as string | null
+      }
 
       // Try update first; if no row, insert
       const { data: existing } = await supabase

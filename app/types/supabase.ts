@@ -10,6 +10,7 @@ export type Database = {
           mobile: string | null
           building_name: string | null
           room_number: string | null
+          area: string | null
           created_at: string
           updated_at: string
         }
@@ -21,6 +22,7 @@ export type Database = {
           mobile?: string | null
           building_name?: string | null
           room_number?: string | null
+          area?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -32,6 +34,7 @@ export type Database = {
           mobile?: string | null
           building_name?: string | null
           room_number?: string | null
+          area?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -126,9 +129,9 @@ export type Database = {
         Update: { name?: string; created_at?: string }
       },
       materials: {
-        Row: { id: number; name: string; created_at: string }
-        Insert: { name: string; created_at?: string }
-        Update: { name?: string; created_at?: string }
+        Row: { id: number; name: string; code?: string | null; created_at: string }
+        Insert: { name: string; code?: string | null; created_at?: string }
+        Update: { name?: string; code?: string | null; created_at?: string }
       },
       assignment_details: {
         Row: {

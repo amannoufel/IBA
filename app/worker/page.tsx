@@ -7,11 +7,12 @@ import { User } from '@supabase/supabase-js'
 
 export default function WorkerDashboard() {
   const [user, setUser] = useState<User | null>(null)
-  type Assignment = { id: number; status: string; created_at: string; is_leader?: boolean; complaint: { id: number; description: string; status: string; created_at: string } }
+  type Assignment = { id: number; status: string; created_at: string; is_leader?: boolean; scheduled_start?: string | null; scheduled_end?: string | null; complaint: { id: number; description: string; status: string; created_at: string } }
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [selected, setSelected] = useState<Assignment | null>(null)
   const [stores, setStores] = useState<Array<{ id: number; name: string }>>([])
-  const [materials, setMaterials] = useState<Array<{ id: number; name: string }>>([])
+  const [materials, setMaterials] = useState<Array<{ id: number; name: string; code?: string | null }>>([])
+  const [materialFilter, setMaterialFilter] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [detail, setDetail] = useState<{ store_id: number | null; materials: number[]; time_in: string | null; time_out: string | null; needs_revisit: boolean } | null>(null)
   const [history, setHistory] = useState<Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>>([])
@@ -253,7 +254,14 @@ export default function WorkerDashboard() {
                         <tr key={a.id} className="hover:bg-slate-50">
                           <td className="px-4 py-2 text-sm">{a.complaint.id}</td>
                           <td className="px-4 py-2 text-sm">{new Date(a.complaint.created_at).toLocaleString()}</td>
-                          <td className="px-4 py-2 text-sm">{a.complaint.description}</td>
+                          <td className="px-4 py-2 text-sm">
+                            <div>{a.complaint.description}</div>
+                            {(a.scheduled_start || a.scheduled_end) && (
+                              <div className="mt-0.5 text-[11px] text-slate-500">
+                                Scheduled: {a.scheduled_start ? new Date(a.scheduled_start).toLocaleString() : '—'} → {a.scheduled_end ? new Date(a.scheduled_end).toLocaleString() : '—'}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-2 text-sm">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${a.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : a.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' : a.status === 'pending_review' ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>{a.status.replace('_',' ')}</span>
                           </td>
@@ -276,9 +284,28 @@ export default function WorkerDashboard() {
                 <p className="text-slate-500 text-sm">Select a job from the table to view and update details.</p>
               ) : (
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-slate-500">Complaint #{selected.complaint.id}</p>
-                    <p className="font-medium text-slate-900">{selected.complaint.description}</p>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-slate-500">Complaint #{selected.complaint.id}</p>
+                        {(selected.scheduled_start || selected.scheduled_end) && (
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Suggested window: {selected.scheduled_start ? new Date(selected.scheduled_start).toLocaleString() : '—'} → {selected.scheduled_end ? new Date(selected.scheduled_end).toLocaleString() : '—'}
+                          </p>
+                        )}
+                        <p className="font-medium text-slate-900">{selected.complaint.description}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium border ${selected.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : selected.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' : selected.status === 'pending_review' ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>{selected.status === 'pending_review' ? 'waiting for review' : selected.status.replace('_',' ')}</span>
+                        <button
+                          onClick={() => selected && updateAssignmentAction(selected.id, 'start')}
+                          disabled={selected.status === 'in_progress' || selected.status === 'pending_review' || selected.status === 'completed'}
+                          className={`px-2 py-1 text-xs rounded border ${selected.status === 'in_progress' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'} ${(selected.status === 'in_progress' || selected.status === 'pending_review' || selected.status === 'completed') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          in progress
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   {!selected.is_leader && (
                     <div className="p-2 text-xs bg-yellow-50 border border-yellow-200 text-yellow-700 rounded">
@@ -305,27 +332,50 @@ export default function WorkerDashboard() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700">Materials used</label>
-                    <div className="border border-slate-200 rounded p-2 max-h-32 overflow-auto bg-white">
-                      {materials.map((m) => {
-                        const checked = detail?.materials?.includes(m.id) ?? false
-                        return (
-                          <label key={m.id} className={`flex items-center gap-2 text-sm ${!selected.is_leader ? 'opacity-60' : ''}`}>
-                            <input
-                              type="checkbox"
-                              disabled={!selected.is_leader}
-                              checked={checked}
-                              onChange={(e) => setDetail((d) => {
-                                const base = d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }
-                                const set = new Set(base.materials)
-                                if (e.target.checked) set.add(m.id); else set.delete(m.id)
-                                return { ...base, materials: Array.from(set) }
-                              })}
-                            />
-                            {m.name}
-                          </label>
-                        )
-                      })}
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-slate-700">Materials used</label>
+                      <input
+                        type="text"
+                        value={materialFilter}
+                        onChange={(e)=>setMaterialFilter(e.target.value)}
+                        placeholder="Filter (code or name)"
+                        className="text-xs border rounded px-2 py-1 w-40"
+                        disabled={!selected.is_leader && materials.length===0}
+                      />
+                    </div>
+                    <select
+                      multiple
+                      size={6}
+                      disabled={!selected.is_leader || materials.length===0}
+                      className="w-full border border-slate-200 rounded bg-white text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60"
+                      value={(detail?.materials || []).map(String)}
+                      onChange={(e) => {
+                        const opts = Array.from(e.target.selectedOptions).map(o => Number(o.value))
+                        setDetail(d => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), materials: opts }))
+                      }}
+                    >
+                      {materials
+                        .filter(m => {
+                          if (!materialFilter.trim()) return true
+                          const hay = `${m.code || ''} ${m.name}`.toLowerCase()
+                          return hay.includes(materialFilter.toLowerCase())
+                        })
+                        .map(m => (
+                          <option key={m.id} value={m.id} className="text-xs">
+                            {(m.code ? m.code : '—')} | {m.name}
+                          </option>
+                        ))}
+                    </select>
+                    <div className="mt-1 flex items-center gap-2">
+                      <p className="text-[10px] text-slate-500 flex-1">Hold Ctrl (Cmd on Mac) to select multiple. Filter to narrow list.</p>
+                      {detail?.materials?.length ? (
+                        <button
+                          type="button"
+                          onClick={() => setDetail(d => ({ ...(d ?? { store_id: null, materials: [], time_in: null, time_out: null, needs_revisit: false }), materials: [] }))}
+                          className="text-[10px] px-2 py-0.5 border rounded bg-white hover:bg-slate-50"
+                          disabled={!selected.is_leader}
+                        >Clear</button>
+                      ) : null}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -360,24 +410,7 @@ export default function WorkerDashboard() {
                     />
                     <label htmlFor="needs-revisit" className="text-sm text-slate-700">Attended once but need to revisit</label>
                   </div>
-                  <div className="flex items-center gap-2">
-                        <div className="ml-auto flex items-center gap-2 w-full justify-end">
-                      <button
-                        onClick={() => selected && updateAssignmentAction(selected.id, 'start')}
-                        disabled={selected.status === 'in_progress' || selected.status === 'pending_review' || selected.status === 'completed'}
-                        className={`px-2 py-1 text-xs rounded border ${selected.status === 'in_progress' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'} ${selected.status === 'in_progress' || selected.status === 'pending_review' || selected.status === 'completed' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        in progress
-                      </button>
-                      <button
-                        onClick={submitForReview}
-                        disabled={submitting || selected.status === 'pending_review' || selected.status === 'completed'}
-                        className={`px-2 py-1 text-xs rounded border ${selected.status === 'pending_review' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'} ${(submitting || selected.status === 'pending_review' || selected.status === 'completed') ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {submitting ? 'Submitting…' : 'Submit for review'}
-                      </button>
-                    </div>
-                  </div>
+                  {/* Action buttons moved: start button now at header; submit moved below team sessions */}
                       {selected?.is_leader && (
                         <div className="mt-3 border-t border-slate-200 pt-3">
                           <div className="flex items-center justify-between mb-2">
@@ -437,6 +470,18 @@ export default function WorkerDashboard() {
                               {teammatesUnavailable ? 'Team list is temporarily unavailable. Apply migrations and refresh.' : 'No teammates found for this job.'}
                             </div>
                           )}
+                        </div>
+                      )}
+                      {/* Submit for review button now placed below team sessions */}
+                      {selected.is_leader && selected.status !== 'pending_review' && selected.status !== 'completed' && (
+                        <div className="mt-3 flex justify-end">
+                          <button
+                            onClick={submitForReview}
+                            disabled={submitting}
+                            className={`px-3 py-1.5 text-xs rounded border ${submitting ? 'opacity-50 cursor-not-allowed bg-indigo-300 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'} `}
+                          >
+                            {submitting ? 'Submitting…' : 'Submit for review'}
+                          </button>
                         </div>
                       )}
                   {selected?.status === 'pending_review' && (

@@ -11,6 +11,19 @@ export default function LoginPage() {
   const [mobile, setMobile] = useState('')
   const [buildingName, setBuildingName] = useState('')
   const [roomNumber, setRoomNumber] = useState('')
+  const [area, setArea] = useState('')
+  
+  // Derived building options for selected area
+  const buildingDirectory: Record<string, string[]> = {
+    'lusail': ['Lusail Tower 1', 'Lusail Tower 2'],
+    'garrafa': ['Garrafa Garden 1', 'Garrafa Garden 2'],
+    'al hilal': ['Hilal Hills 1', 'Hilal Hills 2']
+  }
+
+  useEffect(() => {
+    // Reset building when area changes
+    setBuildingName('')
+  }, [area])
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -82,6 +95,11 @@ export default function LoginPage() {
           setLoading(false)
           return
         }
+        if (!area?.trim()) {
+          setError('Area is required')
+          setLoading(false)
+          return
+        }
       }
       
       if (isSignUp) {
@@ -92,6 +110,9 @@ export default function LoginPage() {
           }
           if (!buildingName?.trim() || !roomNumber?.trim()) {
             throw new Error('Building name and Room number are required for tenants')
+          }
+          if (!area?.trim()) {
+            throw new Error('Area is required for tenants')
           }
         }
 
@@ -107,7 +128,8 @@ export default function LoginPage() {
               ...(role === 'TENANT' ? {
                 mobile,
                 building_name: buildingName,
-                room_number: roomNumber
+                room_number: roomNumber,
+                area,
               } : {})
             },
             emailRedirectTo: redirectTo
@@ -243,24 +265,39 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Building Name
-                    </label>
-                    <input
-                      type="text"
-                      value={buildingName}
-                      onChange={(e) => setBuildingName(e.target.value)}
-                      className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      placeholder="Enter the building name"
+                    <label className="block text-sm font-medium text-gray-700">Area</label>
+                    <select
+                      value={area}
+                      onChange={(e) => setArea(e.target.value)}
+                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                       required
                       disabled={loading}
-                    />
+                    >
+                      <option value="">Select an area</option>
+                      <option value="garrafa">Garrafa</option>
+                      <option value="al hilal">Al Hilal</option>
+                      <option value="lusail">Lusail</option>
+                    </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Room Number
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700">Building</label>
+                    <select
+                      value={buildingName}
+                      onChange={(e) => setBuildingName(e.target.value)}
+                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-100"
+                      required
+                      disabled={loading || !area}
+                    >
+                      <option value="">{area ? 'Select a building' : 'Select area first'}</option>
+                      {(buildingDirectory[area] || []).map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Room Number</label>
                     <input
                       type="text"
                       value={roomNumber}

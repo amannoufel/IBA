@@ -44,7 +44,14 @@ export async function GET(request: Request) {
 
     // Parse optional filter params
     const url = new URL(request.url)
-    const priorityFilter = url.searchParams.get('priority')?.toLowerCase()
+  const priorityFilter = url.searchParams.get('priority')?.toLowerCase()
+  const statusFilterRaw = url.searchParams.get('status')?.toLowerCase() || ''
+  const from = url.searchParams.get('from') // ISO string expected
+  const to = url.searchParams.get('to') // ISO string expected
+  const areaFilter = url.searchParams.get('area')?.toLowerCase() || ''
+  const buildingFilter = url.searchParams.get('building')?.toLowerCase() || ''
+  const categoryFilter = url.searchParams.get('category')?.toLowerCase() || ''
+  const search = url.searchParams.get('search')?.toLowerCase() || ''
 
     let query = supabase
       .from('complaints')
@@ -62,6 +69,17 @@ export async function GET(request: Request) {
 
     if (priorityFilter === 'low' || priorityFilter === 'medium' || priorityFilter === 'high') {
       query = query.eq('priority', priorityFilter)
+    }
+    if (statusFilterRaw && statusFilterRaw !== 'all') {
+      const statuses = statusFilterRaw.split(',').map(s => s.trim()).filter(Boolean)
+      if (statuses.length === 1) query = query.eq('status', statuses[0])
+      else if (statuses.length > 1) query = query.in('status', statuses)
+    }
+    if (from) {
+      query = query.gte('created_at', from)
+    }
+    if (to) {
+      query = query.lte('created_at', to)
     }
 
     // Fetch complaints; RLS should now allow due to supervisor policies
@@ -84,11 +102,11 @@ export async function GET(request: Request) {
     const typeIds = [...new Set(complaints.map(c => c.type_id))]
 
     // Fetch profiles for all tenants (only if we have IDs)
-    let profiles: Array<{ id: string; email: string; name?: string | null; building_name?: string | null; room_number?: string | null }> | null = []
+    let profiles: Array<{ id: string; email: string; name?: string | null; building_name?: string | null; room_number?: string | null; area?: string | null }> | null = []
     if (tenantIds.length > 0) {
       const { data: p, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, name, building_name, room_number')
+        .select('id, email, name, building_name, room_number, area')
         .in('id', tenantIds)
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError)
@@ -117,7 +135,7 @@ export async function GET(request: Request) {
     const profilesMap = (profiles || []).reduce((acc, p) => {
       acc[p.id] = p
       return acc
-  }, {} as Record<string, { id: string; email: string; name?: string | null; building_name?: string | null; room_number?: string | null }>)
+  }, {} as Record<string, { id: string; email: string; name?: string | null; building_name?: string | null; room_number?: string | null; area?: string | null }>)
 
     const typesMap = (complaintTypes || []).reduce((acc, t) => {
       acc[t.id] = t
@@ -125,7 +143,7 @@ export async function GET(request: Request) {
     }, {} as Record<number, { id: number; name: string }>)
 
     // Map to include a public URL if available
-    const result = (complaints || []).map((c: {
+    let result = (complaints || []).map((c: {
       id: number
       type_id: number
       description: string
@@ -151,6 +169,7 @@ export async function GET(request: Request) {
   tenant_name: profile?.name || null,
         building: profile?.building_name || 'Unknown',
         flat: profile?.room_number || 'Unknown',
+        area: profile?.area || null,
         type_id: c.type_id,
         category: complaintType?.name || 'Unknown',
         description: c.description,
@@ -161,6 +180,23 @@ export async function GET(request: Request) {
         created_at: c.created_at,
       }
     })
+
+    // Apply profile/type based filters post mapping (area, building, category, search)
+    if (areaFilter) {
+      result = result.filter(r => (r.area || '').toLowerCase() === areaFilter)
+    }
+    if (buildingFilter) {
+      result = result.filter(r => r.building.toLowerCase() === buildingFilter)
+    }
+    if (categoryFilter) {
+      result = result.filter(r => r.category.toLowerCase() === categoryFilter)
+    }
+    if (search) {
+      result = result.filter(r => {
+        const hay = [r.description, r.tenant_email, r.tenant_name || '', r.building, r.flat, r.category].join(' ').toLowerCase()
+        return hay.includes(search)
+      })
+    }
 
     return NextResponse.json(result)
   } catch {
