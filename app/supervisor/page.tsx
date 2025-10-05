@@ -32,6 +32,7 @@ export default function SupervisorDashboard() {
   const [removeAssignmentIds, setRemoveAssignmentIds] = useState<number[]>([])
   const [leaderEdit, setLeaderEdit] = useState<string | null>(null)
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all')
+  const [showCompleted, setShowCompleted] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [fromDate, setFromDate] = useState<string>('')
   const [toDate, setToDate] = useState<string>('')
@@ -515,104 +516,112 @@ export default function SupervisorDashboard() {
               </div>
             </div>
             
-            {complaints.length === 0 ? (
-              <p className="text-gray-500">No complaints found.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ID
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Tenant
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Building
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Flat
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Category
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {complaints.map((complaint) => (
-                      <tr key={complaint.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{complaint.id}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {complaint.tenant_name || complaint.tenant_email}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(complaint.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {complaint.building}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {complaint.flat}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {complaint.category}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border ${
-                            complaint.status === 'pending'
-                              ? 'bg-yellow-50 text-yellow-800 border-yellow-200'
-                              : complaint.status === 'in_progress'
-                              ? 'bg-blue-50 text-blue-800 border-blue-200'
-                              : complaint.status === 'completed'
-                              ? 'bg-green-50 text-green-800 border-green-200'
-                              : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}>
-                            {complaint.status.replace('_', ' ')}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            title="Click to change priority"
-                            className={priorityBtnClass(((complaint.priority ?? 'medium') as Priority))}
-                            onClick={async () => {
-                              const current = (complaint.priority ?? 'medium') as Priority
-                              const next = nextPriority(current)
-                              const prevP = complaint.priority
-                              // optimistic UI
-                              setComplaints(prev => prev.map(c => c.id === complaint.id ? { ...c, priority: next } : c))
-                              const res = await fetch(`/api/complaints/${complaint.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ priority: next })
-                              })
-                              if (!res.ok) {
-                                // rollback on failure
-                                setComplaints(prev => prev.map(c => c.id === complaint.id ? { ...c, priority: prevP } : c))
-                                alert('Failed to update priority')
-                              }
-                            }}
-                          >
-                            {(complaint.priority ?? 'medium')}
-                          </button>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                          <button onClick={() => handleViewComplaint(complaint)} className="text-indigo-600 hover:text-indigo-900">View</button>
-                        </td>
+            {(() => {
+              if (complaints.length === 0) return <p className="text-gray-500">No complaints found.</p>
+              const active = complaints.filter(c => c.status !== 'completed')
+              const completed = complaints.filter(c => c.status === 'completed')
+              const StatusPill = ({ status }: { status: string }) => (
+                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border ${
+                  status === 'pending'
+                    ? 'bg-yellow-50 text-yellow-800 border-yellow-200'
+                    : status === 'in_progress'
+                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                    : status === 'completed'
+                    ? 'bg-green-50 text-green-800 border-green-200'
+                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                }`}>
+                  {status.replace('_', ' ')}
+                </span>
+              )
+              const Table = ({ rows }: { rows: Complaint[] }) => (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Building</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Flat</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {rows.map(complaint => (
+                        <tr key={complaint.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{complaint.id}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{complaint.tenant_name || complaint.tenant_email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(complaint.created_at).toLocaleDateString()}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{complaint.building}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{complaint.flat}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{complaint.category}</td>
+                          <td className="px-6 py-4 whitespace-nowrap"><StatusPill status={complaint.status} /></td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              title="Click to change priority"
+                              className={priorityBtnClass(((complaint.priority ?? 'medium') as Priority))}
+                              onClick={async () => {
+                                const current = (complaint.priority ?? 'medium') as Priority
+                                const next = nextPriority(current)
+                                const prevP = complaint.priority
+                                setComplaints(prev => prev.map(c => c.id === complaint.id ? { ...c, priority: next } : c))
+                                const res = await fetch(`/api/complaints/${complaint.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ priority: next })
+                                })
+                                if (!res.ok) {
+                                  setComplaints(prev => prev.map(c => c.id === complaint.id ? { ...c, priority: prevP } : c))
+                                  alert('Failed to update priority')
+                                }
+                              }}
+                            >
+                              {(complaint.priority ?? 'medium')}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                            <button onClick={() => handleViewComplaint(complaint)} className="text-indigo-600 hover:text-indigo-900">View</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+              return (
+                <div className="space-y-8">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-slate-700">Active Complaints ({active.length})</h3>
+                      {active.length > 0 && completed.length > 0 && (
+                        <span className="text-[11px] text-slate-500">Completed: {completed.length}</span>
+                      )}
+                    </div>
+                    {active.length === 0 ? (
+                      <p className="text-xs text-slate-500">No active complaints match current filters.</p>
+                    ) : (
+                      <Table rows={active} />
+                    )}
+                  </div>
+                  {completed.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold text-slate-700">Completed Complaints ({completed.length})</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowCompleted(s => !s)}
+                          className="text-xs text-indigo-600 hover:text-indigo-800"
+                        >{showCompleted ? 'Hide' : 'Show'}</button>
+                      </div>
+                      {showCompleted && <Table rows={completed} />}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         </div>
       </main>

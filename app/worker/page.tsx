@@ -18,6 +18,7 @@ export default function WorkerDashboard() {
   const [history, setHistory] = useState<Array<{ visit_id: number; store_id: number | null; store_name: string | null; time_in: string | null; time_out: string | null; needs_revisit: boolean; materials: string[] }>>([])
   const [teammates, setTeammates] = useState<Array<{ assignment_id: number; worker_id: string; email?: string | null; name?: string | null; is_leader: boolean }>>([])
   const [teammatesUnavailable, setTeammatesUnavailable] = useState(false)
+  const [showCompleted, setShowCompleted] = useState(false)
   // Multi-interval session overrides per teammate (keyed by worker_id)
   type IntervalEdit = { start: string; end: string }
   const [teamSessions, setTeamSessions] = useState<Record<string, IntervalEdit[]>>({})
@@ -45,6 +46,10 @@ export default function WorkerDashboard() {
       console.error('Failed to fetch assignments', e)
     }
   }, [])
+
+  // Derived partitions
+  const activeAssignments = assignments.filter(a => a.status !== 'completed')
+  const completedAssignments = assignments.filter(a => a.status === 'completed')
 
   useEffect(() => {
     const checkUser = async () => {
@@ -237,44 +242,107 @@ export default function WorkerDashboard() {
               {assignments.length === 0 ? (
                 <p className="text-slate-500">No assignments yet.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">ID</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Created</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Description</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Status</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Leader</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-slate-100">
-                      {assignments.map((a) => (
-                        <tr key={a.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-2 text-sm">{a.complaint.id}</td>
-                          <td className="px-4 py-2 text-sm">{new Date(a.complaint.created_at).toLocaleString()}</td>
-                          <td className="px-4 py-2 text-sm">
-                            <div>{a.complaint.description}</div>
-                            {(a.scheduled_start || a.scheduled_end) && (
-                              <div className="mt-0.5 text-[11px] text-slate-500">
-                                Scheduled: {a.scheduled_start ? new Date(a.scheduled_start).toLocaleString() : '—'} → {a.scheduled_end ? new Date(a.scheduled_end).toLocaleString() : '—'}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-2 text-sm">
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${a.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : a.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' : a.status === 'pending_review' ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>{a.status.replace('_',' ')}</span>
-                          </td>
-                          <td className="px-4 py-2 text-sm">
-                            {a.is_leader ? <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border bg-green-50 text-green-700 border-green-200">Leader</span> : <span className="text-slate-400 text-xs">—</span>}
-                          </td>
-                          <td className="px-4 py-2 text-sm">
-                            <button onClick={() => openDetail(a)} className="inline-flex items-center text-indigo-600 hover:text-indigo-800">View / Update</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-8">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-slate-700">Active ({activeAssignments.length})</h3>
+                      {completedAssignments.length > 0 && (
+                        <span className="text-[11px] text-slate-500">Completed: {completedAssignments.length}</span>
+                      )}
+                    </div>
+                    {activeAssignments.length === 0 ? (
+                      <p className="text-xs text-slate-500">No active assignments.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-slate-200">
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">ID</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Created</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Description</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Status</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Leader</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-slate-100">
+                            {activeAssignments.map(a => (
+                              <tr key={a.id} className="hover:bg-slate-50">
+                                <td className="px-4 py-2 text-sm">{a.complaint.id}</td>
+                                <td className="px-4 py-2 text-sm">{new Date(a.complaint.created_at).toLocaleString()}</td>
+                                <td className="px-4 py-2 text-sm">
+                                  <div>{a.complaint.description}</div>
+                                  {(a.scheduled_start || a.scheduled_end) && (
+                                    <div className="mt-0.5 text-[11px] text-slate-500">
+                                      Scheduled: {a.scheduled_start ? new Date(a.scheduled_start).toLocaleString() : '—'} → {a.scheduled_end ? new Date(a.scheduled_end).toLocaleString() : '—'}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2 text-sm">
+                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${a.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : a.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' : a.status === 'pending_review' ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>{a.status.replace('_',' ')}</span>
+                                </td>
+                                <td className="px-4 py-2 text-sm">{a.is_leader ? <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border bg-green-50 text-green-700 border-green-200">Leader</span> : <span className="text-slate-400 text-xs">—</span>}</td>
+                                <td className="px-4 py-2 text-sm">
+                                  <button onClick={() => openDetail(a)} className="inline-flex items-center text-indigo-600 hover:text-indigo-800">View / Update</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                  {completedAssignments.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold text-slate-700">Completed ({completedAssignments.length})</h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowCompleted(s => !s)}
+                          className="text-xs text-indigo-600 hover:text-indigo-800"
+                        >{showCompleted ? 'Hide' : 'Show'}</button>
+                      </div>
+                      {showCompleted && (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50">
+                              <tr>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">ID</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Created</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Description</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Status</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Leader</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-slate-100">
+                              {completedAssignments.map(a => (
+                                <tr key={a.id} className="hover:bg-slate-50">
+                                  <td className="px-4 py-2 text-sm">{a.complaint.id}</td>
+                                  <td className="px-4 py-2 text-sm">{new Date(a.complaint.created_at).toLocaleString()}</td>
+                                  <td className="px-4 py-2 text-sm">
+                                    <div>{a.complaint.description}</div>
+                                    {(a.scheduled_start || a.scheduled_end) && (
+                                      <div className="mt-0.5 text-[11px] text-slate-500">
+                                        Scheduled: {a.scheduled_start ? new Date(a.scheduled_start).toLocaleString() : '—'} → {a.scheduled_end ? new Date(a.scheduled_end).toLocaleString() : '—'}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm">
+                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${a.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : a.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' : a.status === 'pending_review' ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>{a.status.replace('_',' ')}</span>
+                                  </td>
+                                  <td className="px-4 py-2 text-sm">{a.is_leader ? <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border bg-green-50 text-green-700 border-green-200">Leader</span> : <span className="text-slate-400 text-xs">—</span>}</td>
+                                  <td className="px-4 py-2 text-sm">
+                                    <button onClick={() => openDetail(a)} className="inline-flex items-center text-indigo-600 hover:text-indigo-800">View / Update</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -313,11 +381,6 @@ export default function WorkerDashboard() {
                     </div>
                   )}
                   <div>
-                    {teammates.length > 0 && (
-                      <div className="mb-2 text-xs text-gray-600">
-                        <span className="font-medium">Assigned workers:</span> {teammates.map(t => `${t.name || t.email || t.worker_id}${t.is_leader ? ' (Leader)' : ''}`).join(', ')}
-                      </div>
-                    )}
                     <label className="block text-sm font-medium text-slate-700">Store</label>
                     <select
                       value={detail?.store_id ?? ''}
