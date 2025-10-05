@@ -29,7 +29,7 @@ export async function GET(
   // Fetch latest visit for this assignment (may not exist yet)
   const { data: visit } = await supabase
     .from('assignment_visits')
-    .select('id, assignment_id, store_id, time_in, time_out, outcome')
+    .select('id, assignment_id, store_id, time_in, time_out, outcome, note')
     .eq('assignment_id', assignmentId)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -49,7 +49,7 @@ export async function GET(
   // Build visit history: all visits for this assignment, with store names and materials
   const { data: allVisits } = await supabase
     .from('assignment_visits')
-    .select('id, assignment_id, store_id, time_in, time_out, outcome')
+  .select('id, assignment_id, store_id, time_in, time_out, outcome, note')
     .eq('assignment_id', assignmentId)
     .order('created_at', { ascending: false })
 
@@ -145,6 +145,7 @@ export async function GET(
           time_in: visit.time_in,
           time_out: visit.time_out,
           needs_revisit: visit.outcome === 'revisit',
+          note: (visit as any).note ?? null,
         }
       : null,
     materials_used: matsList.map((m) => m.material_id),
@@ -173,6 +174,7 @@ export async function PUT(
     time_in?: string | null
     time_out?: string | null
     needs_revisit?: boolean
+    note?: string | null
   } | null
 
   if (!body) return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
@@ -182,6 +184,7 @@ export async function PUT(
   if (body.time_in === null || typeof body.time_in === 'string') payload.time_in = body.time_in
   if (body.time_out === null || typeof body.time_out === 'string') payload.time_out = body.time_out
   if (typeof body.needs_revisit === 'boolean') payload.needs_revisit = body.needs_revisit
+  if (body.note === null || typeof body.note === 'string') payload.note = body.note
 
   // Ensure an open visit exists (time_out is null); if not, create one
   const { data: openVisit } = await supabase
@@ -207,7 +210,7 @@ export async function PUT(
   if (payload.store_id !== undefined) visitUpdate.store_id = payload.store_id
   if (payload.time_in !== undefined) visitUpdate.time_in = payload.time_in
   if (payload.time_out !== undefined) visitUpdate.time_out = payload.time_out
-  if (payload.needs_revisit !== undefined || payload.time_out !== undefined) {
+  if (payload.needs_revisit !== undefined || payload.time_out !== undefined || payload.note !== undefined) {
     const needsRevisit = typeof body.needs_revisit === 'boolean' ? body.needs_revisit : false
     // If revisit is requested and no explicit time_out provided, close the current visit now
     if (needsRevisit && (body.time_out === undefined || body.time_out === null)) {

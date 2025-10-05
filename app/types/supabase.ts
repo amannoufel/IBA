@@ -175,6 +175,7 @@ export type Database = {
           time_in: string | null
           time_out: string | null
           outcome: 'completed' | 'revisit' | null
+          note?: string | null
           created_at: string
           created_by: string | null
           updated_at: string
@@ -185,6 +186,7 @@ export type Database = {
           time_in?: string | null
           time_out?: string | null
           outcome?: 'completed' | 'revisit' | null
+          note?: string | null
           created_at?: string
           created_by?: string | null
           updated_at?: string
@@ -195,6 +197,7 @@ export type Database = {
           time_in?: string | null
           time_out?: string | null
           outcome?: 'completed' | 'revisit' | null
+          note?: string | null
           created_at?: string
           created_by?: string | null
           updated_at?: string
