@@ -145,7 +145,7 @@ export async function GET(
           time_in: visit.time_in,
           time_out: visit.time_out,
           needs_revisit: visit.outcome === 'revisit',
-          note: (visit as any).note ?? null,
+          note: (visit as { note?: string | null }).note ?? null,
         }
       : null,
     materials_used: matsList.map((m) => m.material_id),

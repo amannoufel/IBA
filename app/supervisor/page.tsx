@@ -201,30 +201,7 @@ export default function SupervisorDashboard() {
     })
   }
 
-  const handleStatusUpdate = async (id: number, newStatus: string) => {
-    try {
-      const response = await fetch(`/api/complaints/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to update status')
-      }
-      
-      // Update the complaint in the UI
-      setComplaints(complaints.map(c => c.id === id ? { ...c, status: newStatus } : c))
-      
-      if (selectedComplaint?.id === id) {
-        setSelectedComplaint({ ...selectedComplaint, status: newStatus })
-      }
-    } catch (error) {
-      console.error('Error updating status:', error)
-    }
-  }
+  // Removed unused handleStatusUpdate (status derived from assignments)
 
   const toIso = (val: string | null | undefined) => {
     if (!val) return null
